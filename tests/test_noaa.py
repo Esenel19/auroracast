@@ -18,6 +18,20 @@ class FakeResponse:
             raise RuntimeError(f"HTTP {self.status_code}")
 
 
+class OfflineSession:
+    """Session factice : robots.txt « absent », aucun accès réseau."""
+
+    def robots_info(self, url):
+        return {"robots_url": "x/robots.txt", "status": "absent (test)", "allowed": True,
+                "crawl_delay": None}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        pass
+
+
 def make_fetcher(content: bytes, status: int = 200):
     return lambda url, session: FakeResponse(content, status)
 
@@ -53,6 +67,7 @@ def test_collect_one_records_failures_without_writing(tmp_path, body, status):
 def test_run_appends_one_manifest_line_per_source(tmp_path):
     body = json.dumps([["a"], ["b"]]).encode()
     noaa.run(tmp_path, only=["kp_observed", "alerts"], now=lambda: FIXED,
+             session_factory=OfflineSession,
              fetcher=make_fetcher(body))
     lines = (tmp_path / "noaa" / "manifest.jsonl").read_text(encoding="utf-8").splitlines()
     assert [json.loads(line)["source"] for line in lines] == ["kp_observed", "alerts"]
@@ -60,12 +75,13 @@ def test_run_appends_one_manifest_line_per_source(tmp_path):
 
 def test_run_rejects_unknown_source(tmp_path):
     with pytest.raises(SystemExit):
-        noaa.run(tmp_path, only=["inexistante"])
+        noaa.run(tmp_path, only=["inexistante"], session_factory=OfflineSession)
 
 
 def test_run_manifest_writes_one_file_per_execution(tmp_path):
     body = json.dumps([["a"], ["b"]]).encode()
     noaa.run(tmp_path, only=["alerts"], run_manifest=True, now=lambda: FIXED,
+             session_factory=OfflineSession,
              fetcher=make_fetcher(body))
     expected = tmp_path / "noaa/manifests/2026/10/26/run_20261026T190005Z.jsonl"
     assert expected.exists()
@@ -93,3 +109,10 @@ def test_window_fails_when_feed_is_stale(tmp_path):
     rec = noaa.collect_one(rtsw_source(), tmp_path, session=None, now=lambda: FIXED,
                            fetcher=make_fetcher(json.dumps(rows).encode()))
     assert rec["ok"] is False and "aucune donnée" in rec["error"]
+
+
+def test_run_records_robots_result_in_manifest(tmp_path):
+    body = json.dumps([["a"], ["b"]]).encode()
+    rec = noaa.run(tmp_path, only=["alerts"], now=lambda: FIXED,
+                   session_factory=OfflineSession, fetcher=make_fetcher(body))[0]
+    assert rec["robots"]["allowed"] is True

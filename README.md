@@ -86,19 +86,6 @@ Points de vigilance : GitHub peut retarder ou sauter une exécution planifiée (
 vent solaire garde les 3 dernières heures pour rattraper ces trous) et suspend les planifications
 d'un dépôt public resté 60 jours sans activité.
 
-## Backfill de l'historique
-
-### Kp depuis 1932 (GFZ Potsdam)
-
-```powershell
-python -m auroracast.collect.gfz        # en local
-```
-
-Dans le cloud : onglet *Actions* > « Backfill historique Kp (GFZ) » > **Run workflow**.
-Le fichier brut est archivé dans `gfz/kp_ap_ap_sn_f107/AAAA/MM/JJ/` de la branche `raw-data`,
-avec un rapport `*_qualite.json` : période couverte, jours manquants ou en double, Kp hors de
-[0, 9], date à partir de laquelle les valeurs sont encore provisoires.
-
 ### Collecte locale toutes les heures (option)
 
 Si le PC reste allumé, dans un terminal, depuis le dossier du projet :
@@ -111,13 +98,40 @@ Le journal s'écrit dans `data\raw\collect.log`. Pour arrêter :
 `schtasks /Delete /TN "AuroraCast collecte NOAA"`. Cette tâche est provisoire : elle sera
 remplacée par un DAG Airflow.
 
+## Backfill de l'historique
+
+Onglet *Actions* > « Backfill historique » > **Run workflow**, en choisissant la source
+(`tout`, `gfz`, `omni`, `openmeteo`) et la première année. En local :
+
+```powershell
+python -m auroracast.collect.gfz                         # Kp, ap, SN, F10.7 depuis 1932
+python -m auroracast.collect.omni --start-year 2010      # vent solaire horaire (crawling)
+python -m auroracast.collect.openmeteo --start-year 2010 # nébulosité horaire
+```
+
+| Source | Technique | Archivé dans `raw-data` | Rapport de qualité |
+| --- | --- | --- | --- |
+| GFZ Potsdam | API (fichier HTTPS) | `gfz/kp_ap_ap_sn_f107/AAAA/MM/JJ/` | jours manquants ou en double, Kp hors [0, 9], valeurs provisoires |
+| OMNIWeb (NASA SPDF) | crawling du répertoire `low_res_omni` | `omni/omni2/AAAA/MM/JJ/` (+ page d'index) | heures manquantes ou en double, part de valeurs absentes pour Bz, Bt, vitesse, densité |
+| Open-Meteo | API d'archive, par lieu et par année | `openmeteo/cloud_cover/AAAA/MM/JJ/<lieu>/` | heures manquantes, valeurs nulles, valeurs hors [0, 100] |
+
+Lieux cibles provisoires pour la nébulosité : Tromsø, Abisko, Rovaniemi (option `--location NOM:LAT:LON`).
+
+## Respect des sites (robots.txt)
+
+Tous les collecteurs passent par `auroracast.collect.web.PoliteSession`, qui lit le robots.txt
+de chaque site avant le premier téléchargement (RFC 9309) : une URL interdite n'est pas
+téléchargée, le Crawl-delay est respecté (pause d'au moins 1 s entre deux requêtes, 5 s pour
+Open-Meteo), et le résultat est noté dans le manifeste (champ `robots`).
+
 ## Sources et licences
 
 | Source | Données | Licence / conditions |
 | --- | --- | --- |
 | [NOAA SWPC](https://services.swpc.noaa.gov/) | Kp, prévisions, vent solaire, IMF, alertes | Données publiques, à citer |
-| [GFZ Potsdam](https://kp.gfz.de/) | Historique du Kp depuis 1932 | CC BY 4.0 (taches solaires : CC BY-NC 4.0) |
-| [Open-Meteo](https://open-meteo.com/) | Nébulosité | CC BY 4.0, usage non commercial |
+| [GFZ Potsdam](https://kp.gfz.de/) | Historique du Kp depuis 1932 | CC BY 4.0 (taches solaires WDC-SILSO : CC BY-NC 4.0) ; citer Matzka et al. (2021), DOI 10.5880/Kp.0001 |
+| [OMNIWeb, NASA SPDF](https://omniweb.gsfc.nasa.gov/) | Vent solaire et IMF horaires | Citer OMNI Hourly Data, DOI 10.48322/1shr-ht18, avec la date d'accès |
+| [Open-Meteo](https://open-meteo.com/) | Nébulosité | CC BY 4.0, usage non commercial ; lien « Weather data by Open-Meteo.com » à côté des données |
 
 Bonnes pratiques de collecte : User-Agent identifiable, nouvelles tentatives espacées,
 au plus une collecte par heure, aucune image ni graphique collecté.

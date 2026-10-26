@@ -29,8 +29,22 @@ class FakeResponse:
             raise RuntimeError(f"HTTP {self.status_code}")
 
 
+class OfflineSession:
+    """Session factice : robots.txt « absent », aucun accès réseau."""
+
+    def robots_info(self, url):
+        return {"robots_url": "x/robots.txt", "status": "absent (test)", "allowed": True,
+                "crawl_delay": None}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        pass
+
+
 def run(tmp_path, content, status=200):
-    return gfz.collect(tmp_path, now=lambda: FIXED,
+    return gfz.collect(tmp_path, now=lambda: FIXED, session_factory=OfflineSession,
                        fetcher=lambda url, session, timeout: FakeResponse(content, status))
 
 

@@ -32,6 +32,8 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
+from auroracast.collect.web import PoliteSession
+
 load_dotenv()  # lit le fichier .env du dossier courant s'il existe
 
 log = logging.getLogger("auroracast.collect.noaa")
@@ -152,6 +154,8 @@ def collect_one(
     }
     t0 = time.monotonic()
     try:
+        if hasattr(session, "robots_info"):
+            record["robots"] = session.robots_info(source.url)
         resp = fetcher(source.url, session)
         record["http_status"] = resp.status_code
         resp.raise_for_status()
@@ -199,14 +203,14 @@ def run(
     out_dir: Path = DEFAULT_OUT,
     only: list[str] | None = None,
     run_manifest: bool = False,
+    session_factory: Callable[[], PoliteSession] = lambda: PoliteSession(USER_AGENT),
     **kwargs,
 ) -> list[dict]:
     selected = [s for s in SOURCES if not only or s.name in only]
     unknown = set(only or []) - {s.name for s in SOURCES}
     if unknown:
         raise SystemExit(f"Sources inconnues : {', '.join(sorted(unknown))}")
-    with requests.Session() as session:
-        session.headers["User-Agent"] = USER_AGENT
+    with session_factory() as session:
         records = [collect_one(s, out_dir, session, **kwargs) for s in selected]
     started = kwargs.get("now", utc_now)()
     append_manifest(out_dir, records, per_run=started if run_manifest else None)

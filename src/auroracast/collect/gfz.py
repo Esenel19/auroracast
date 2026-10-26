@@ -28,6 +28,7 @@ from pathlib import Path
 import requests
 
 from auroracast.collect.noaa import DEFAULT_OUT, USER_AGENT, fetch, utc_now
+from auroracast.collect.web import PoliteSession
 
 log = logging.getLogger("auroracast.collect.gfz")
 
@@ -109,14 +110,15 @@ def collect(
     out_dir: Path = DEFAULT_OUT,
     now: Callable[[], datetime] = utc_now,
     fetcher: Callable[..., requests.Response] = fetch,
+    session_factory: Callable[[], PoliteSession] = lambda: PoliteSession(USER_AGENT),
 ) -> dict:
     """Télécharge le fichier GFZ, l'archive, écrit le rapport et le manifeste."""
     started = now()
     record = {"source": NAME, "technique": "api", "url": URL,
               "collected_at": started.isoformat(), "ok": False}
     try:
-        with requests.Session() as session:
-            session.headers["User-Agent"] = USER_AGENT
+        with session_factory() as session:
+            record["robots"] = session.robots_info(URL)
             resp = fetcher(URL, session, timeout=120)
         record["http_status"] = resp.status_code
         resp.raise_for_status()
