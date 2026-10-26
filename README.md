@@ -9,7 +9,7 @@ Projet de certification **RNCP 39586** (Ingénieur en science des données), sp�
 
 ## Chaîne de données
 
-1. **Collecte** : API NOAA SWPC et Open-Meteo, scraping des bulletins texte, crawling des archives, requêtes SQL
+1. **Collecte** : API NOAA SWPC et GFZ, scraping des bulletins texte, crawling des archives OMNIWeb, fichiers NOAA GHCNh, requêtes SQL
 2. **Données brutes** : archivées telles quelles, horodatées, avec un manifeste
 3. **Nettoyage** : alignement à l'heure UTC, valeurs manquantes, agrégations
 4. **Entrepôt** : PostgreSQL, schéma en étoile
