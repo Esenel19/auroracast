@@ -1,0 +1,18 @@
+{
+  "_doc": "Station NOAA GHCNh retenue pour chaque lieu cible. null = choix automatique au prochain backfill (règle : station la plus proche à moins de 30 km dont les nuages sont renseignés au moins 30 % des heures).",
+  "tromso": {
+    "station_id": "NOM00001026",
+    "name": "TROMSO",
+    "distance_km": 0.9,
+    "chosen_on": "2026-10-26",
+    "reason": "Seule station à moins de 25 km qui relève les nuages : 33 % des heures en 2025 (relevés toutes les 3 heures)."
+  },
+  "kiruna": null,
+  "rovaniemi": {
+    "station_id": "FIM00002847",
+    "name": "ROVANIEMI RAUTATIEASEMA",
+    "distance_km": 0.7,
+    "chosen_on": "2026-10-26",
+    "reason": "Station la plus proche ; nuages renseignés 92 % des heures en 2025."
+  }
+}

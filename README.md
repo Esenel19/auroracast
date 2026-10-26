@@ -101,11 +101,12 @@ remplacée par un DAG Airflow.
 ## Backfill de l'historique
 
 Onglet *Actions* > « Backfill historique » > **Run workflow**, en choisissant la source
-(`tout`, `gfz`, `omni`) et la première année. En local :
+(`tout`, `gfz`, `omni`, `ghcnh`) et la première année. En local :
 
 ```powershell
 python -m auroracast.collect.gfz                         # Kp, ap, SN, F10.7 depuis 1932
 python -m auroracast.collect.omni --start-year 2010      # vent solaire horaire (crawling)
+python -m auroracast.collect.ghcnh backfill --start-year 2010   # nébulosité observée
 ```
 
 | Source | Technique | Archivé dans `raw-data` | Rapport de qualité |
@@ -124,9 +125,20 @@ python -m auroracast.collect.ghcnh stations --year 2025
 ```
 
 Dans le cloud : *Actions* > « Recherche des stations météo (GHCNh) » > **Run workflow**. Pour
-chaque lieu cible (provisoirement Tromsø, Abisko, Rovaniemi ; option `--location NOM:LAT:LON`),
-le rapport liste les stations les plus proches, leur distance et la part d'heures où les
-nuages sont renseignés.
+chaque lieu cible (Tromsø, Kiruna, Rovaniemi ; option `--location NOM:LAT:LON`), le rapport
+liste les stations les plus proches, leur distance et la part d'heures où les nuages sont
+renseignés.
+
+Les stations retenues sont fixées dans `src/auroracast/data/stations.json`. Un lieu à `null`
+reçoit une station choisie automatiquement au backfill, selon une règle écrite : la plus
+proche à moins de 30 km dont les nuages sont renseignés au moins 30 % des heures.
+
+Le backfill (*Backfill historique*, source `ghcnh`) archive chaque fichier annuel compressé
+(`ghcnh/hourly/AAAA/MM/JJ/<lieu>/GHCNh_<station>_<année>.psv.gz`, contenu inchangé) avec un
+rapport de qualité : heures couvertes par une observation de nuages, répartition des octas,
+plus long trou entre deux observations. Décodage : la couche la plus couverte parmi
+`sky_cover_layer_1` à `4` (`CLR:00` dégagé … `OVC:08` couvert, `VV:09` ciel invisible compté
+8 octas), sinon la couverture totale de `sky_condition`.
 
 ## Respect des sites (robots.txt)
 

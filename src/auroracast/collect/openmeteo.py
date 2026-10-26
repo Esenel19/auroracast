@@ -23,7 +23,6 @@ import json
 import logging
 import sys
 from collections.abc import Callable
-from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -32,6 +31,7 @@ import requests
 from auroracast.collect.common import write_run_manifest
 from auroracast.collect.noaa import DEFAULT_OUT, USER_AGENT, fetch, utc_now
 from auroracast.collect.web import PoliteSession
+from auroracast.locations import LOCATIONS, Location
 
 log = logging.getLogger("auroracast.collect.openmeteo")
 
@@ -39,26 +39,6 @@ API_URL = "https://archive-api.open-meteo.com/v1/archive"
 VARIABLES = ("cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high")
 DATA_DELAY_DAYS = 6   # l'archive ERA5 a environ 5 jours de retard
 PAUSE_S = 5.0
-
-
-@dataclass(frozen=True)
-class Location:
-    name: str
-    lat: float
-    lon: float
-
-    @classmethod
-    def parse(cls, text: str) -> Location:
-        name, lat, lon = text.rsplit(":", 2)
-        return cls(name.strip(), float(lat), float(lon))
-
-
-# Lieux cibles provisoires (zone aurorale, à confirmer avec le directeur).
-LOCATIONS = (
-    Location("tromso", 69.6496, 18.9560),
-    Location("abisko", 68.3495, 18.8312),
-    Location("rovaniemi", 66.5039, 25.7294),
-)
 
 
 def year_range(year: int, today: date) -> tuple[date, date] | None:
@@ -151,7 +131,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--start-year", type=int, default=2010)
     parser.add_argument("--end-year", type=int, default=None)
     parser.add_argument("--location", action="append", metavar="NOM:LAT:LON",
-                        help="lieu cible (répétable) ; par défaut Tromsø, Abisko, Rovaniemi")
+                        help="lieu cible (répétable) ; par défaut Tromsø, Kiruna, Rovaniemi")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     locations = tuple(Location.parse(t) for t in args.location) if args.location else LOCATIONS

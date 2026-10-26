@@ -1,4 +1,7 @@
+import gzip
 from datetime import UTC, datetime
+
+import pytest
 
 from auroracast.collect import ghcnh
 from auroracast.collect.openmeteo import Location
@@ -83,3 +86,87 @@ def test_find_stations_builds_report_and_markdown(tmp_path):
     assert (tmp_path / "ghcnh/stations/recherche_stations_20261026T210000Z.json").exists()
     md = ghcnh.to_markdown(report)
     assert "TROMSO LANGNES" in md and "`BKN:07` (2)" in md
+
+
+# --- backfill ---------------------------------------------------------------
+
+YEAR_PSV = (
+    "STATION|DATE|sky_condition|sky_cover_layer_1|sky_cover_layer_2\n"
+    "S1|2025-01-01T00:00:00|07;;06|BKN:05|OVC:08\n"      # couche la plus couverte : 8
+    "S1|2025-01-01T00:50:00||FEW:01|\n"                  # même heure : compte une fois
+    "S1|2025-01-01T03:00:00|02;;02||\n"                  # repli sur sky_condition : 2
+    "S1|2025-01-01T06:00:00||VV:09|\n"                   # brouillard : 8
+    "S1|2025-01-01T07:00:00|||\n"                        # pas de nuages
+)
+
+
+@pytest.mark.parametrize("row,expected", [
+    ({"sky_cover_layer_1": "BKN:05", "sky_cover_layer_2": "OVC:08"}, 8),
+    ({"sky_cover_layer_1": "CLR:00"}, 0),
+    ({"sky_cover_layer_1": "VV:09"}, 8),
+    ({"sky_condition": "03;;01"}, 3),
+    ({"sky_condition": ";;08"}, None),
+    ({"sky_cover_layer_1": "XX:99"}, None),
+    ({}, None),
+])
+def test_total_oktas(row, expected):
+    assert ghcnh.total_oktas(row) == expected
+
+
+def test_cloud_quality_counts_distinct_hours_and_gaps():
+    q = ghcnh.cloud_quality(YEAR_PSV, 2025)
+    assert q["rows"] == 5 and q["hours_with_cloud"] == 3
+    assert q["longest_gap_h"] == 3.0
+    assert q["oktas_distribution"]["8"] == 2 and q["oktas_distribution"]["2"] == 1
+    assert q["expected_hours"] == 7  # année en cours : jusqu'à la dernière observation
+
+
+def test_select_station_prefers_closest_qualified():
+    cands = [
+        {"id": "A", "distance_km": 1.0, "best_sky_share": 0.1},   # trop peu de nuages
+        {"id": "B", "distance_km": 12.0, "best_sky_share": 0.9},
+        {"id": "C", "distance_km": 8.0, "best_sky_share": 0.4},
+        {"id": "D", "distance_km": 45.0, "best_sky_share": 1.0},  # trop loin
+    ]
+    assert ghcnh.select_station(cands)["id"] == "C"
+    assert ghcnh.select_station(cands[:1]) is None
+
+
+def test_backfill_pinned_and_auto_selected_stations(tmp_path):
+    kiruna = Location("kiruna", 67.8558, 20.2253)
+    station_csv = "GHCN_ID,LATITUDE,LONGITUDE,NAME\nSWX00000001,67.82,20.34,KIRUNA AIRPORT\n"
+    inspect_psv = PSV  # 67 % de nuages : station retenue
+
+    def fetcher(url, session, timeout=30):
+        if url == ghcnh.STATION_LIST_URL:
+            return Resp(station_csv)
+        if "SWX00000001_2025" in url:
+            return Resp(inspect_psv)
+        if url.endswith("_2026.psv"):
+            return Resp(YEAR_PSV)
+        return Resp("", 404)
+
+    config = {"tromso": {"station_id": "NOM00001026", "name": "TROMSO", "distance_km": 0.9,
+                         "reason": "fixée"}, "kiruna": None}
+    records = ghcnh.backfill(tmp_path, 2025, 2026, (TROMSO, kiruna), config, now=lambda: FIXED,
+                             fetcher=fetcher, session_factory=OfflineSession)
+    by = {r["source"]: r for r in records}
+    assert by["station_kiruna"]["station"]["station_id"] == "SWX00000001"
+    assert "Choix automatique" in by["station_kiruna"]["station"]["reason"]
+    assert by["cloud_tromso_2025"]["missing_year"] is True
+    rec = by["cloud_kiruna_2026"]
+    assert rec["ok"] and rec["quality"]["hours_with_cloud"] == 3
+    assert gzip.decompress((tmp_path / rec["file"]).read_bytes()).decode() == YEAR_PSV
+    md = ghcnh.backfill_markdown(records)
+    assert "KIRUNA AIRPORT" in md and "| kiruna | 2026 | ok | 3 |" in md
+
+
+def test_backfill_reports_location_without_station(tmp_path):
+    far = Location("nulle_part", 0.0, 0.0)
+
+    def fetcher(url, session, timeout=30):
+        return Resp("GHCN_ID,LATITUDE,LONGITUDE,NAME\nX,10.0,10.0,LOIN\n")
+
+    records = ghcnh.backfill(tmp_path, 2025, 2025, (far,), {}, now=lambda: FIXED,
+                             fetcher=fetcher, session_factory=OfflineSession)
+    assert records[0]["ok"] is False and "aucune station" in records[0]["error"]
