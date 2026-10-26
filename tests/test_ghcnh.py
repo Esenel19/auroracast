@@ -13,10 +13,11 @@ STATION_CSV = (
     "BAD,not-a-number,0,0,,BROKEN\n"
 )
 PSV = (
-    "Station_ID|Station_name|DATE|Latitude|Longitude|sky_cover_1|sky_cover_baseht_1|sky_cover_2\n"
-    "NOE00000001|TROMSO|2025-01-01T00:00:00|69.68|18.91|BKN:07|600|\n"
-    "NOE00000001|TROMSO|2025-01-01T01:00:00|69.68|18.91||| \n"
-    "NOE00000001|TROMSO|2025-01-01T02:00:00|69.68|18.91|BKN:07|700|OVC:08\n"
+    "STATION|Station_name|DATE|sky_cover_layer_1|sky_cover_layer_1_Quality_Code|"
+    "sky_cover_layer_baseht_1|sky_cover_summation_1\n"
+    "NOE00000001|TROMSO|2025-01-01T00:00:00|BKN:07|1|600|\n"
+    "NOE00000001|TROMSO|2025-01-01T01:00:00||||\n"
+    "NOE00000001|TROMSO|2025-01-01T02:00:00|BKN:07|1|700|OVC:08\n"
 )
 
 
@@ -38,11 +39,12 @@ def test_distance_and_nearest_filters_far_stations():
     assert near[0]["distance_km"] < 5
 
 
-def test_inspect_year_file_measures_cloud_filling():
+def test_inspect_year_file_measures_each_cloud_column():
     info = ghcnh.inspect_year_file(PSV)
-    assert info["rows"] == 3 and info["sky_cover_1_filled"] == 2
-    assert info["sky_cover_1_samples"] == [("BKN:07", 2)]
-    assert info["sky_cover_columns"] == ["sky_cover_1", "sky_cover_baseht_1", "sky_cover_2"]
+    assert info["rows"] == 3
+    assert list(info["sky"]) == ["sky_cover_layer_1", "sky_cover_summation_1"]  # sans codes ni hauteurs
+    assert info["sky"]["sky_cover_layer_1"] == {"share": 0.667, "samples": [("BKN:07", 2)]}
+    assert info["best_sky_column"] == "sky_cover_layer_1" and info["best_sky_share"] == 0.667
     assert info["first_date"] == "2025-01-01T00:00:00" and info["last_date"].endswith("02:00:00")
 
 
@@ -77,7 +79,7 @@ def test_find_stations_builds_report_and_markdown(tmp_path):
     report = ghcnh.find_stations(tmp_path, 2025, (TROMSO,), now=lambda: FIXED,
                                  fetcher=fetcher, session_factory=OfflineSession)
     cands = report["locations"][0]["candidates"]
-    assert cands[0]["sky_cover_1_share"] == 0.667 and cands[1]["http_status"] == 404
+    assert cands[0]["best_sky_share"] == 0.667 and cands[1]["http_status"] == 404
     assert (tmp_path / "ghcnh/stations/recherche_stations_20261026T210000Z.json").exists()
     md = ghcnh.to_markdown(report)
     assert "TROMSO LANGNES" in md and "`BKN:07` (2)" in md

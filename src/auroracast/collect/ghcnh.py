@@ -90,23 +90,35 @@ def distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 6371.0 * 2 * math.asin(math.sqrt(a))
 
 
-def nearest(stations: list[dict], loc: Location, n: int = 6, max_km: float = 150) -> list[dict]:
+def nearest(stations: list[dict], loc: Location, n: int = 10, max_km: float = 150) -> list[dict]:
     scored = [{**s, "distance_km": round(distance_km(loc.lat, loc.lon, s["lat"], s["lon"]), 1)}
               for s in stations]
     scored = [s for s in scored if s["distance_km"] <= max_km]
     return sorted(scored, key=lambda s: s["distance_km"])[:n]
 
 
-def inspect_year_file(text: str, max_samples: int = 12) -> dict:
-    """Examine un fichier annuel PSV : colonnes, période, remplissage des nuages."""
+SUFFIXES = ("_measurement_code", "_quality_code", "_report_type", "_source_code",
+            "_source_station_id")
+
+
+def sky_columns(header: list[str]) -> list[int]:
+    """Colonnes de valeurs de nuages (sky_condition, sky_cover_layer_*, sky_cover_summation_*),
+    sans leurs colonnes de codes associées."""
+    return [i for i, h in enumerate(header)
+            if h.strip().lower().startswith("sky_") and "baseht" not in h.lower()
+            and not h.strip().lower().endswith(SUFFIXES)]
+
+
+def inspect_year_file(text: str, max_samples: int = 8) -> dict:
+    """Examine un fichier annuel PSV : période et remplissage de chaque colonne de nuages."""
     reader = csv.reader(io.StringIO(text), delimiter="|")
     header = next(reader)
     i_date = _pick(header, "date")
-    sky_cols = [i for i, h in enumerate(header) if h.strip().lower().startswith("sky_cover")]
-    i_sky1 = _pick(header, "sky_cover_1")
-    rows = filled = 0
+    cols = sky_columns(header)
+    filled = Counter()
+    samples = {i: Counter() for i in cols}
+    rows = 0
     first = last = None
-    samples: Counter[str] = Counter()
     for r in reader:
         if not r:
             continue
@@ -114,18 +126,21 @@ def inspect_year_file(text: str, max_samples: int = 12) -> dict:
         if i_date is not None and i_date < len(r):
             first = first or r[i_date]
             last = r[i_date]
-        if i_sky1 is not None and i_sky1 < len(r) and r[i_sky1].strip():
-            filled += 1
-            samples[r[i_sky1].strip()] += 1
+        for i in cols:
+            if i < len(r) and r[i].strip():
+                filled[i] += 1
+                samples[i][r[i].strip()] += 1
+    sky = {header[i]: {"share": round(filled[i] / rows, 3) if rows else 0.0,
+                       "samples": samples[i].most_common(max_samples)} for i in cols}
+    best = max(sky, key=lambda k: sky[k]["share"]) if sky else None
     return {
         "columns": len(header),
-        "sky_cover_columns": [header[i] for i in sky_cols],
         "rows": rows,
         "first_date": first,
         "last_date": last,
-        "sky_cover_1_filled": filled,
-        "sky_cover_1_share": round(filled / rows, 3) if rows else 0.0,
-        "sky_cover_1_samples": samples.most_common(max_samples),
+        "sky": sky,
+        "best_sky_column": best,
+        "best_sky_share": sky[best]["share"] if best else 0.0,
         "header": header,
     }
 
@@ -134,7 +149,7 @@ def find_stations(
     out_dir: Path = DEFAULT_OUT,
     year: int = 2025,
     locations: tuple[Location, ...] = LOCATIONS,
-    per_location: int = 4,
+    per_location: int = 10,
     now: Callable[[], datetime] = utc_now,
     fetcher: Callable[..., requests.Response] = fetch,
     session_factory: Callable[[], PoliteSession] = lambda: PoliteSession(USER_AGENT),
@@ -173,18 +188,16 @@ def to_markdown(report: dict) -> str:
              f"{report.get('stations_in_list', '?')} stations dans la liste officielle.", ""]
     for loc in report["locations"]:
         lines += [f"### {loc['location']} ({loc['lat']}, {loc['lon']})", "",
-                  "| Station | Nom | Distance (km) | Fichier | Lignes | Nuages renseignés | Exemples |",
-                  "| --- | --- | --- | --- | --- | --- | --- |"]
+                  "| Station | Nom | Distance (km) | Fichier | Lignes | Meilleure colonne nuages | Remplie | Exemples |",
+                  "| --- | --- | --- | --- | --- | --- | --- | --- |"]
         for c in loc["candidates"]:
-            ex = ", ".join(f"`{v}` ({n})" for v, n in c.get("sky_cover_1_samples", [])[:5])
-            share = f"{c['sky_cover_1_share']:.0%}" if "sky_cover_1_share" in c else "—"
+            best = c.get("best_sky_column")
+            ex = ", ".join(f"`{v}` ({n})" for v, n in c["sky"][best]["samples"][:4]) if best else ""
+            share = f"{c['best_sky_share']:.0%}" if "best_sky_share" in c else "—"
             lines.append(f"| {c['id']} | {c['name']} | {c['distance_km']} | "
                          f"{c.get('http_status', c.get('error', '?'))} | {c.get('rows', '—')} | "
-                         f"{share} | {ex} |")
+                         f"{best or '—'} | {share} | {ex} |")
         lines.append("")
-    first = next((c for loc in report["locations"] for c in loc["candidates"] if "header" in c), None)
-    if first:
-        lines += ["Colonnes d'un fichier annuel :", "", "`" + "|".join(first["header"]) + "`", ""]
     return "\n".join(lines)
 
 
