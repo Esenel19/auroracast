@@ -114,11 +114,13 @@ def test_total_oktas(row, expected):
 
 
 def test_cloud_quality_counts_distinct_hours_and_gaps():
-    q = ghcnh.cloud_quality(YEAR_PSV, 2025)
+    q = ghcnh.cloud_quality(YEAR_PSV, 2025, current_year=2025)
     assert q["rows"] == 5 and q["hours_with_cloud"] == 3
     assert q["longest_gap_h"] == 3.0
     assert q["oktas_distribution"]["8"] == 2 and q["oktas_distribution"]["2"] == 1
     assert q["expected_hours"] == 7  # année en cours : jusqu'à la dernière observation
+    past = ghcnh.cloud_quality(YEAR_PSV, 2025, current_year=2026)
+    assert past["expected_hours"] == 8760  # année passée : l'année entière est attendue
 
 
 def test_select_station_prefers_closest_qualified():

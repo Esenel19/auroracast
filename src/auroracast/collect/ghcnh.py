@@ -261,7 +261,7 @@ def total_oktas(row: dict) -> int | None:
     return _oktas(cond.split(";")[0]) if cond and cond.split(";")[0] else None
 
 
-def cloud_quality(text: str, year: int) -> dict:
+def cloud_quality(text: str, year: int, current_year: int | None = None) -> dict:
     """Rapport de qualité d'un fichier annuel : heures couvertes par une observation
     de nuages, répartition des octas, plus long trou entre deux observations."""
     reader = csv.DictReader(io.StringIO(text), delimiter="|")
@@ -283,7 +283,7 @@ def cloud_quality(text: str, year: int) -> dict:
     ordered = sorted(hours)
     gaps = [(b - a).total_seconds() / 3600 for a, b in itertools.pairwise(ordered)]
     expected = (datetime(year + 1, 1, 1) - datetime(year, 1, 1)).days * 24
-    if ordered and ordered[-1].year == year and ordered[-1] < datetime(year, 12, 31):
+    if year == current_year and ordered:  # année en cours : jusqu'à la dernière observation
         expected = int((ordered[-1] - datetime(year, 1, 1)).total_seconds() // 3600) + 1
     share = round(len(hours) / expected, 3) if expected else 0.0
     report = {
@@ -371,7 +371,8 @@ def backfill(
                         records.append(rec)
                         continue
                     resp.raise_for_status()
-                    report = cloud_quality(resp.content.decode("utf-8", errors="replace"), year)
+                    report = cloud_quality(resp.content.decode("utf-8", errors="replace"), year,
+                                           current_year=started.year)
                     path = day_dir / loc.name / f"GHCNh_{chosen['station_id']}_{year}.psv.gz"
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_bytes(gzip.compress(resp.content, mtime=0))

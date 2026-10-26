@@ -7,7 +7,13 @@
     "chosen_on": "2026-10-26",
     "reason": "Seule station à moins de 25 km qui relève les nuages : 33 % des heures en 2025 (relevés toutes les 3 heures)."
   },
-  "kiruna": null,
+  "kiruna": {
+    "station_id": "SWI0000ESNQ",
+    "name": "KIRUNA (aéroport, ESNQ)",
+    "distance_km": 6.0,
+    "chosen_on": "2026-10-26",
+    "reason": "Choix automatique du backfill du 26/10/2026, fixé ensuite : plus proche station à moins de 30 km qui relève les nuages (84 % des heures en 2025)."
+  },
   "rovaniemi": {
     "station_id": "FIM00002847",
     "name": "ROVANIEMI RAUTATIEASEMA",
