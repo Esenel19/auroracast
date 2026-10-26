@@ -86,6 +86,19 @@ Points de vigilance : GitHub peut retarder ou sauter une exécution planifiée (
 vent solaire garde les 3 dernières heures pour rattraper ces trous) et suspend les planifications
 d'un dépôt public resté 60 jours sans activité.
 
+## Backfill de l'historique
+
+### Kp depuis 1932 (GFZ Potsdam)
+
+```powershell
+python -m auroracast.collect.gfz        # en local
+```
+
+Dans le cloud : onglet *Actions* > « Backfill historique Kp (GFZ) » > **Run workflow**.
+Le fichier brut est archivé dans `gfz/kp_ap_ap_sn_f107/AAAA/MM/JJ/` de la branche `raw-data`,
+avec un rapport `*_qualite.json` : période couverte, jours manquants ou en double, Kp hors de
+[0, 9], date à partir de laquelle les valeurs sont encore provisoires.
+
 ### Collecte locale toutes les heures (option)
 
 Si le PC reste allumé, dans un terminal, depuis le dossier du projet :

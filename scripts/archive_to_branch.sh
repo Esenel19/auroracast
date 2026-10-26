@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Copie un dossier de données brutes dans une branche Git dédiée et la pousse.
-# Usage : scripts/archive_to_branch.sh <dossier_source> <branche>
+# Usage : scripts/archive_to_branch.sh <dossier_source> <branche> [libellé du commit]
 # La branche est créée vide (orpheline) au premier lancement.
 # Prévu pour GitHub Actions (étape « Archiver dans la branche raw-data »).
 set -euo pipefail
 
 SRC="$1"
 BRANCH="$2"
+LABEL="${3:-Collecte NOAA}"
 STORE="$(mktemp -d)/store"
 git worktree prune
 trap 'git worktree remove --force "$STORE" 2> /dev/null || true' EXIT
@@ -30,6 +31,6 @@ fi
 
 git -C "$STORE" -c user.name="auroracast-bot" \
   -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-  commit --quiet -m "Collecte NOAA $(date -u +%Y-%m-%dT%H:%MZ)"
+  commit --quiet -m "$LABEL $(date -u +%Y-%m-%dT%H:%MZ)"
 git -C "$STORE" push --quiet origin "$BRANCH"
 echo "Archivé dans la branche $BRANCH."

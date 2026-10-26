@@ -1,0 +1,35 @@
+name: Backfill historique Kp (GFZ)
+
+# Téléchargement à la demande de l'historique du Kp depuis 1932 (GFZ Potsdam),
+# archivé tel quel dans la branche raw-data avec son rapport de qualité.
+# À relancer quand on veut rafraîchir l'historique (le GFZ le met à jour chaque jour).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: collecte-noaa   # même groupe que la collecte horaire : pas de push simultané
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt && pip install -e .
+
+      - name: Télécharger l'historique GFZ
+        env:
+          AURORACAST_CONTACT: ${{ vars.AURORACAST_CONTACT }}
+        run: python -m auroracast.collect.gfz --out raw
+
+      - name: Archiver dans la branche raw-data
+        run: scripts/archive_to_branch.sh raw raw-data "Backfill GFZ"
