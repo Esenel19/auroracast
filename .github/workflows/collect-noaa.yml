@@ -1,15 +1,20 @@
 name: Collecte NOAA horaire
 
 # Collecte automatique toutes les heures, sans PC allumé.
-# Les fichiers bruts sont déposés dans Azure Blob Storage (conteneur "raw").
-# Prérequis (Settings > Secrets and variables > Actions) :
-#   - secret   AZURE_STORAGE_CONNECTION_STRING
-#   - variable AURORACAST_CONTACT (adresse de contact envoyée dans le User-Agent)
+# Stockage provisoire et gratuit : les fichiers bruts sont commités dans la
+# branche « raw-data » du dépôt (le code reste seul sur « main »).
+# Plus tard : ajouter le secret AZURE_STORAGE_CONNECTION_STRING et les fichiers
+# partiront aussi dans Azure Blob Storage, sans autre changement.
+# Variable conseillée (Settings > Secrets and variables > Actions > Variables) :
+#   AURORACAST_CONTACT = adresse de contact envoyée dans le User-Agent
 
 on:
   schedule:
     - cron: "7 * * * *"   # à hh:07 UTC (éviter hh:00, très chargé chez GitHub)
   workflow_dispatch:       # bouton « Run workflow » pour lancer à la main
+
+permissions:
+  contents: write          # nécessaire pour pousser dans la branche raw-data
 
 concurrency:
   group: collecte-noaa
@@ -19,6 +24,8 @@ jobs:
   collect:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -29,15 +36,17 @@ jobs:
 
       - name: Collecter
         id: collect
-        continue-on-error: true   # on dépose quand même ce qui a réussi
+        continue-on-error: true   # on archive quand même ce qui a réussi
         env:
           AURORACAST_CONTACT: ${{ vars.AURORACAST_CONTACT }}
         run: python -m auroracast.collect.noaa --out raw --run-manifest
 
-      - name: Déposer dans Azure Blob Storage
+      - name: Archiver dans la branche raw-data
         if: always()
-        env:
-          AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+        run: scripts/archive_to_branch.sh raw raw-data
+
+      - name: Déposer aussi dans Azure Blob Storage (si configuré)
+        if: always() && env.AZURE_STORAGE_CONNECTION_STRING != ''
         run: |
           az storage container create --name raw --only-show-errors > /dev/null
           az storage blob upload-batch --destination raw --source raw --only-show-errors

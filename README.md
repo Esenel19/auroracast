@@ -63,21 +63,28 @@ Le code de sortie vaut 1 si au moins une source a échoué.
 ### Collecte automatique dans le cloud (recommandé)
 
 Le workflow `.github/workflows/collect-noaa.yml` lance la collecte **toutes les heures sur
-GitHub Actions**, PC éteint, et dépose les fichiers bruts dans Azure Blob Storage
-(conteneur `raw`). Mise en route :
+GitHub Actions**, PC éteint. Stockage provisoire et gratuit : chaque exécution commite ses
+fichiers bruts dans la branche **`raw-data`** du dépôt (le code reste seul sur `main`).
 
-1. Sur le portail Azure, créer un **compte de stockage** (Standard, LRS), puis copier sa
-   **chaîne de connexion** (menu « Clés d'accès »).
-2. Sur GitHub, dans *Settings > Secrets and variables > Actions* :
-   - onglet *Secrets* : `AZURE_STORAGE_CONNECTION_STRING` = la chaîne de connexion ;
-   - onglet *Variables* : `AURORACAST_CONTACT` = ton adresse de contact.
-3. Onglet *Actions* > « Collecte NOAA horaire » > **Run workflow** pour tester tout de suite.
+Mise en route :
 
-En mode cloud, chaque exécution écrit son propre manifeste dans
+1. Sur GitHub, dans *Settings > Secrets and variables > Actions > Variables* :
+   `AURORACAST_CONTACT` = ton adresse de contact.
+2. Onglet *Actions* > « Collecte NOAA horaire » > **Run workflow** pour tester tout de suite.
+
+Chaque exécution écrit son propre manifeste dans
 `noaa/manifests/AAAA/MM/JJ/run_<horodatage>.jsonl`. Si une source échoue, l'exécution est
-marquée en échec et GitHub t'envoie un e-mail. Points de vigilance : GitHub peut retarder une
-exécution planifiée de quelques minutes, et il suspend les planifications d'un dépôt public
-resté 60 jours sans activité.
+marquée en échec et GitHub t'envoie un e-mail.
+
+Pour récupérer les données sur ton PC : `git fetch origin raw-data` puis
+`git worktree add ../auroracast-data raw-data`.
+
+**Passage à Azure plus tard** : ajouter le secret `AZURE_STORAGE_CONNECTION_STRING` ; les
+fichiers partiront aussi dans Azure Blob Storage (conteneur `raw`), sans autre changement.
+
+Points de vigilance : GitHub peut retarder ou sauter une exécution planifiée (les fichiers
+de vent solaire couvrent 6 heures pour rattraper ces trous) et suspend les planifications
+d'un dépôt public resté 60 jours sans activité.
 
 ### Collecte locale toutes les heures (option)
 

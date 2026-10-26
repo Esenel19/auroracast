@@ -54,14 +54,15 @@ class Source:
         return Path(self.path).suffix.lstrip(".") or "txt"
 
 
-# Cadence conseillée : toutes les heures (les fichiers « 1 jour » se recouvrent,
-# le dédoublonnage se fera à l'étape de nettoyage).
+# Cadence conseillée : toutes les heures. Les fichiers « 6 heures » du vent solaire
+# rattrapent jusqu'à 5 exécutions manquées tout en restant légers ; les recouvrements
+# entre exécutions seront dédoublonnés à l'étape de nettoyage.
 SOURCES: tuple[Source, ...] = (
     Source("kp_observed", "/products/noaa-planetary-k-index.json", "api"),
     Source("kp_forecast", "/products/noaa-planetary-k-index-forecast.json", "api"),
     Source("kp_1m", "/json/planetary_k_index_1m.json", "api"),
-    Source("solar_wind_mag", "/products/solar-wind/mag-1-day.json", "api"),
-    Source("solar_wind_plasma", "/products/solar-wind/plasma-1-day.json", "api"),
+    Source("solar_wind_mag", "/products/solar-wind/mag-6-hour.json", "api"),
+    Source("solar_wind_plasma", "/products/solar-wind/plasma-6-hour.json", "api"),
     Source("noaa_scales", "/products/noaa-scales.json", "api"),
     Source("alerts", "/products/alerts.json", "api"),
     Source("forecast_3day_text", "/text/3-day-forecast.txt", "scraping"),
