@@ -101,28 +101,39 @@ remplacée par un DAG Airflow.
 ## Backfill de l'historique
 
 Onglet *Actions* > « Backfill historique » > **Run workflow**, en choisissant la source
-(`tout`, `gfz`, `omni`, `openmeteo`) et la première année. En local :
+(`tout`, `gfz`, `omni`) et la première année. En local :
 
 ```powershell
 python -m auroracast.collect.gfz                         # Kp, ap, SN, F10.7 depuis 1932
 python -m auroracast.collect.omni --start-year 2010      # vent solaire horaire (crawling)
-python -m auroracast.collect.openmeteo --start-year 2010 # nébulosité horaire
 ```
 
 | Source | Technique | Archivé dans `raw-data` | Rapport de qualité |
 | --- | --- | --- | --- |
 | GFZ Potsdam | API (fichier HTTPS) | `gfz/kp_ap_ap_sn_f107/AAAA/MM/JJ/` | jours manquants ou en double, Kp hors [0, 9], valeurs provisoires |
 | OMNIWeb (NASA SPDF) | crawling du répertoire `low_res_omni` | `omni/omni2/AAAA/MM/JJ/` (+ page d'index) | heures manquantes ou en double, part de valeurs absentes pour Bz, Bt, vitesse, densité |
-| Open-Meteo | API d'archive, par lieu et par année | `openmeteo/cloud_cover/AAAA/MM/JJ/<lieu>/` | heures manquantes, valeurs nulles, valeurs hors [0, 100] |
 
-Lieux cibles provisoires pour la nébulosité : Tromsø, Abisko, Rovaniemi (option `--location NOM:LAT:LON`).
+### Nébulosité observée (NOAA GHCNh)
+
+Open-Meteo est écarté : le robots.txt de son API d'archive interdit l'accès (incident INC-002
+du journal des incidents). La nébulosité viendra des observations horaires des stations
+NOAA GHCNh (CC0). Première étape, le choix des stations :
+
+```powershell
+python -m auroracast.collect.ghcnh stations --year 2025
+```
+
+Dans le cloud : *Actions* > « Recherche des stations météo (GHCNh) » > **Run workflow**. Pour
+chaque lieu cible (provisoirement Tromsø, Abisko, Rovaniemi ; option `--location NOM:LAT:LON`),
+le rapport liste les stations les plus proches, leur distance et la part d'heures où les
+nuages sont renseignés.
 
 ## Respect des sites (robots.txt)
 
 Tous les collecteurs passent par `auroracast.collect.web.PoliteSession`, qui lit le robots.txt
 de chaque site avant le premier téléchargement (RFC 9309) : une URL interdite n'est pas
 téléchargée, le Crawl-delay est respecté (pause d'au moins 1 s entre deux requêtes, 5 s pour
-Open-Meteo), et le résultat est noté dans le manifeste (champ `robots`).
+les API qui comptent les requêtes), et le résultat est noté dans le manifeste (champ `robots`).
 
 ## Sources et licences
 
@@ -131,7 +142,7 @@ Open-Meteo), et le résultat est noté dans le manifeste (champ `robots`).
 | [NOAA SWPC](https://services.swpc.noaa.gov/) | Kp, prévisions, vent solaire, IMF, alertes | Données publiques, à citer |
 | [GFZ Potsdam](https://kp.gfz.de/) | Historique du Kp depuis 1932 | CC BY 4.0 (taches solaires WDC-SILSO : CC BY-NC 4.0) ; citer Matzka et al. (2021), DOI 10.5880/Kp.0001 |
 | [OMNIWeb, NASA SPDF](https://omniweb.gsfc.nasa.gov/) | Vent solaire et IMF horaires | Citer OMNI Hourly Data, DOI 10.48322/1shr-ht18, avec la date d'accès |
-| [Open-Meteo](https://open-meteo.com/) | Nébulosité | CC BY 4.0, usage non commercial ; lien « Weather data by Open-Meteo.com » à côté des données |
+| [NOAA GHCNh](https://www.ncei.noaa.gov/products/global-historical-climatology-network-hourly) | Nébulosité observée par les stations | CC0 ; citer NOAA NCEI, GHCNh Version 1, DOI 10.25921/jp3d-3v19 |
 
 Bonnes pratiques de collecte : User-Agent identifiable, nouvelles tentatives espacées,
 au plus une collecte par heure, aucune image ni graphique collecté.

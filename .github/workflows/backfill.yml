@@ -4,7 +4,7 @@ name: Backfill historique
 # raw-data avec un rapport de qualité par fichier :
 #   - gfz       : Kp, ap, taches solaires, F10.7 depuis 1932 (GFZ Potsdam, API)
 #   - omni      : vent solaire et IMF horaires (OMNIWeb NASA, crawling du répertoire)
-#   - openmeteo : nébulosité horaire des lieux cibles (Open-Meteo, API d'archive)
+#   (Open-Meteo retiré : son robots.txt interdit l'API d'archive, voir le journal des incidents)
 
 on:
   workflow_dispatch:
@@ -12,10 +12,10 @@ on:
       source:
         description: "Source à récupérer"
         type: choice
-        options: [tout, gfz, omni, openmeteo]
+        options: [tout, gfz, omni]
         default: tout
       start_year:
-        description: "Première année (OMNIWeb et Open-Meteo)"
+        description: "Première année (OMNIWeb)"
         default: "2010"
 
 permissions:
@@ -51,18 +51,12 @@ jobs:
         continue-on-error: true
         run: python -m auroracast.collect.omni --out raw --start-year "${{ inputs.start_year }}"
 
-      - name: Open-Meteo (nébulosité horaire)
-        id: openmeteo
-        if: inputs.source == 'tout' || inputs.source == 'openmeteo'
-        continue-on-error: true
-        run: python -m auroracast.collect.openmeteo --out raw --start-year "${{ inputs.start_year }}"
-
       - name: Archiver dans la branche raw-data
         if: always()
         run: scripts/archive_to_branch.sh raw raw-data "Backfill ${{ inputs.source }}"
 
       - name: Signaler un échec
-        if: steps.gfz.outcome == 'failure' || steps.omni.outcome == 'failure' || steps.openmeteo.outcome == 'failure'
+        if: steps.gfz.outcome == 'failure' || steps.omni.outcome == 'failure'
         run: |
           echo "::error::Au moins une source du backfill a échoué (voir les manifestes)."
           exit 1

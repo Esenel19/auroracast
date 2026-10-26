@@ -1,0 +1,40 @@
+name: Recherche des stations météo (GHCNh)
+
+# Cherche, pour chaque lieu cible, les stations NOAA GHCNh les plus proches et
+# vérifie sur un fichier annuel qu'elles relèvent bien la couverture nuageuse.
+# Le résultat s'affiche dans le résumé de l'exécution et est archivé dans raw-data.
+
+on:
+  workflow_dispatch:
+    inputs:
+      year:
+        description: "Année du fichier à examiner"
+        default: "2025"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: collecte-noaa
+  cancel-in-progress: false
+
+jobs:
+  stations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      AURORACAST_CONTACT: ${{ vars.AURORACAST_CONTACT }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt && pip install -e .
+
+      - name: Chercher les stations
+        run: python -m auroracast.collect.ghcnh stations --out raw --year "${{ inputs.year }}" --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Archiver le rapport dans raw-data
+        if: always()
+        run: scripts/archive_to_branch.sh raw raw-data "Recherche stations GHCNh"
