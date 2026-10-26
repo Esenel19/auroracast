@@ -1,0 +1,14 @@
+{
+  "first_date": "1932-01-01",
+  "last_date": "2026-10-25",
+  "days": 34632,
+  "expected_days": 34632,
+  "missing_days": 0,
+  "missing_sample": [],
+  "duplicate_days": 0,
+  "kp_slots": 277056,
+  "kp_missing_slots": 0,
+  "kp_out_of_range": 0,
+  "kp_preliminary_since": "2026-10-01",
+  "warnings": []
+}
