@@ -61,3 +61,12 @@ def test_run_appends_one_manifest_line_per_source(tmp_path):
 def test_run_rejects_unknown_source(tmp_path):
     with pytest.raises(SystemExit):
         noaa.run(tmp_path, only=["inexistante"])
+
+
+def test_run_manifest_writes_one_file_per_execution(tmp_path):
+    body = json.dumps([["a"], ["b"]]).encode()
+    noaa.run(tmp_path, only=["alerts"], run_manifest=True, now=lambda: FIXED,
+             fetcher=make_fetcher(body))
+    expected = tmp_path / "noaa/manifests/2026/10/26/run_20261026T190005Z.jsonl"
+    assert expected.exists()
+    assert not (tmp_path / "noaa" / "manifest.jsonl").exists()

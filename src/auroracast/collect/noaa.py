@@ -151,8 +151,17 @@ def collect_one(
     return record
 
 
-def append_manifest(out_dir: Path, records: list[dict]) -> Path:
-    manifest = out_dir / "noaa" / "manifest.jsonl"
+def manifest_path(out_dir: Path, per_run: datetime | None = None) -> Path:
+    """Manifeste cumulé (local) ou un fichier par exécution (cloud, où chaque
+    exécution part d'un dossier vide et ne doit pas écraser les précédentes)."""
+    if per_run is None:
+        return out_dir / "noaa" / "manifest.jsonl"
+    stamp = per_run.strftime("%Y%m%dT%H%M%SZ")
+    return out_dir / "noaa" / "manifests" / per_run.strftime("%Y/%m/%d") / f"run_{stamp}.jsonl"
+
+
+def append_manifest(out_dir: Path, records: list[dict], per_run: datetime | None = None) -> Path:
+    manifest = manifest_path(out_dir, per_run)
     manifest.parent.mkdir(parents=True, exist_ok=True)
     with manifest.open("a", encoding="utf-8") as fh:
         for rec in records:
@@ -160,7 +169,12 @@ def append_manifest(out_dir: Path, records: list[dict]) -> Path:
     return manifest
 
 
-def run(out_dir: Path = DEFAULT_OUT, only: list[str] | None = None, **kwargs) -> list[dict]:
+def run(
+    out_dir: Path = DEFAULT_OUT,
+    only: list[str] | None = None,
+    run_manifest: bool = False,
+    **kwargs,
+) -> list[dict]:
     selected = [s for s in SOURCES if not only or s.name in only]
     unknown = set(only or []) - {s.name for s in SOURCES}
     if unknown:
@@ -168,7 +182,8 @@ def run(out_dir: Path = DEFAULT_OUT, only: list[str] | None = None, **kwargs) ->
     with requests.Session() as session:
         session.headers["User-Agent"] = USER_AGENT
         records = [collect_one(s, out_dir, session, **kwargs) for s in selected]
-    append_manifest(out_dir, records)
+    started = kwargs.get("now", utc_now)()
+    append_manifest(out_dir, records, per_run=started if run_manifest else None)
     ok = sum(r["ok"] for r in records)
     log.info("%d/%d sources collectées dans %s", ok, len(records), out_dir)
     return records
@@ -179,9 +194,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT, help="dossier des données brutes")
     parser.add_argument("--only", nargs="+", metavar="SOURCE",
                         help="sources à collecter : " + ", ".join(s.name for s in SOURCES))
+    parser.add_argument("--run-manifest", action="store_true",
+                        help="un manifeste par exécution (mode cloud) au lieu du manifeste cumulé")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    records = run(args.out, args.only)
+    records = run(args.out, args.only, run_manifest=args.run_manifest)
     return 0 if all(r["ok"] for r in records) else 1
 
 

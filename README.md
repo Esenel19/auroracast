@@ -60,9 +60,28 @@ Fichiers produits :
 
 Le code de sortie vaut 1 si au moins une source a échoué.
 
-### Lancer la collecte toutes les heures
+### Collecte automatique dans le cloud (recommandé)
 
-Dans un terminal, depuis le dossier du projet :
+Le workflow `.github/workflows/collect-noaa.yml` lance la collecte **toutes les heures sur
+GitHub Actions**, PC éteint, et dépose les fichiers bruts dans Azure Blob Storage
+(conteneur `raw`). Mise en route :
+
+1. Sur le portail Azure, créer un **compte de stockage** (Standard, LRS), puis copier sa
+   **chaîne de connexion** (menu « Clés d'accès »).
+2. Sur GitHub, dans *Settings > Secrets and variables > Actions* :
+   - onglet *Secrets* : `AZURE_STORAGE_CONNECTION_STRING` = la chaîne de connexion ;
+   - onglet *Variables* : `AURORACAST_CONTACT` = ton adresse de contact.
+3. Onglet *Actions* > « Collecte NOAA horaire » > **Run workflow** pour tester tout de suite.
+
+En mode cloud, chaque exécution écrit son propre manifeste dans
+`noaa/manifests/AAAA/MM/JJ/run_<horodatage>.jsonl`. Si une source échoue, l'exécution est
+marquée en échec et GitHub t'envoie un e-mail. Points de vigilance : GitHub peut retarder une
+exécution planifiée de quelques minutes, et il suspend les planifications d'un dépôt public
+resté 60 jours sans activité.
+
+### Collecte locale toutes les heures (option)
+
+Si le PC reste allumé, dans un terminal, depuis le dossier du projet :
 
 ```powershell
 schtasks /Create /SC HOURLY /TN "AuroraCast collecte NOAA" /TR "\"$PWD\scripts\collect_noaa.bat\""
