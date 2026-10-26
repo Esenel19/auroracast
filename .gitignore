@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Secrets
+.env
+
+# Données : jamais dans Git (volumineuses, rejouables depuis le brut)
+data/*
+!data/raw/
+data/raw/*
+!data/raw/.gitkeep
+mlruns/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Système
+.DS_Store
+Thumbs.db
