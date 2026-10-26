@@ -44,6 +44,7 @@ class Source:
     name: str
     path: str
     technique: str  # "api" (JSON) ou "scraping" (texte non structuré)
+    window_hours: int | None = None  # ne garder que les N dernières heures (gros fichiers)
 
     @property
     def url(self) -> str:
@@ -54,15 +55,15 @@ class Source:
         return Path(self.path).suffix.lstrip(".") or "txt"
 
 
-# Cadence conseillée : toutes les heures. Les fichiers « 6 heures » du vent solaire
-# rattrapent jusqu'à 5 exécutions manquées tout en restant légers ; les recouvrements
-# entre exécutions seront dédoublonnés à l'étape de nettoyage.
+# Cadence conseillée : toutes les heures. Les fichiers temps réel du vent solaire
+# (RTSW, plusieurs Mo) sont réduits aux 3 dernières heures : de quoi rattraper
+# 2 exécutions manquées. Les recouvrements seront dédoublonnés au nettoyage.
 SOURCES: tuple[Source, ...] = (
     Source("kp_observed", "/products/noaa-planetary-k-index.json", "api"),
     Source("kp_forecast", "/products/noaa-planetary-k-index-forecast.json", "api"),
     Source("kp_1m", "/json/planetary_k_index_1m.json", "api"),
-    Source("solar_wind_mag", "/products/solar-wind/mag-6-hour.json", "api"),
-    Source("solar_wind_plasma", "/products/solar-wind/plasma-6-hour.json", "api"),
+    Source("solar_wind_mag", "/json/rtsw/rtsw_mag_1m.json", "api", window_hours=3),
+    Source("solar_wind_plasma", "/json/rtsw/rtsw_wind_1m.json", "api", window_hours=3),
     Source("noaa_scales", "/products/noaa-scales.json", "api"),
     Source("alerts", "/products/alerts.json", "api"),
     Source("forecast_3day_text", "/text/3-day-forecast.txt", "scraping"),
@@ -113,6 +114,26 @@ def validate(source: Source, content: bytes) -> None:
             raise ValueError("JSON vide")
 
 
+def parse_time_tag(value: str) -> datetime:
+    """Lit un time_tag NOAA (« 2026-10-26T19:40:00 » ou « 2026-10-26 19:40:00.000 »), en UTC."""
+    parsed = datetime.fromisoformat(value.replace(" ", "T").rstrip("Z"))
+    return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed
+
+
+def trim_window(content: bytes, now: datetime, hours: int) -> tuple[bytes, int, int]:
+    """Garde les enregistrements des N dernières heures d'une liste JSON d'objets
+    portant un « time_tag ». Les enregistrements gardés ne sont pas modifiés.
+    Renvoie (contenu, lignes gardées, lignes reçues)."""
+    rows = json.loads(content)
+    if not isinstance(rows, list) or not all(isinstance(r, dict) and "time_tag" in r for r in rows):
+        raise ValueError("format inattendu : liste d'objets avec time_tag attendue")
+    cutoff = now.timestamp() - hours * 3600
+    kept = [r for r in rows if parse_time_tag(r["time_tag"]).timestamp() >= cutoff]
+    if not kept:
+        raise ValueError(f"aucune donnée sur les {hours} dernières heures (flux arrêté ?)")
+    return json.dumps(kept, ensure_ascii=False).encode(), len(kept), len(rows)
+
+
 def collect_one(
     source: Source,
     out_dir: Path,
@@ -136,6 +157,10 @@ def collect_one(
         resp.raise_for_status()
         content = resp.content
         validate(source, content)
+        if source.window_hours:
+            record["bytes_received"] = len(content)
+            content, kept, total = trim_window(content, started, source.window_hours)
+            record.update(rows_kept=kept, rows_received=total)
         path = target_path(out_dir, source, started)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(content)

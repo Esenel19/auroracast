@@ -82,8 +82,8 @@ Pour récupérer les données sur ton PC : `git fetch origin raw-data` puis
 **Passage à Azure plus tard** : ajouter le secret `AZURE_STORAGE_CONNECTION_STRING` ; les
 fichiers partiront aussi dans Azure Blob Storage (conteneur `raw`), sans autre changement.
 
-Points de vigilance : GitHub peut retarder ou sauter une exécution planifiée (les fichiers
-de vent solaire couvrent 6 heures pour rattraper ces trous) et suspend les planifications
+Points de vigilance : GitHub peut retarder ou sauter une exécution planifiée (chaque collecte du
+vent solaire garde les 3 dernières heures pour rattraper ces trous) et suspend les planifications
 d'un dépôt public resté 60 jours sans activité.
 
 ### Collecte locale toutes les heures (option)
