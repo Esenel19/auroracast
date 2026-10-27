@@ -1,0 +1,35 @@
+[
+  {
+    "usaf": "028470",
+    "wban": "99999",
+    "name": "ROVANIEMI RAUTATIEASEMA",
+    "country": "FI",
+    "lat": 66.5,
+    "lon": 25.717,
+    "first_day": "20080115",
+    "last_day": "20210920",
+    "distance_km": 0.7
+  },
+  {
+    "usaf": "028450",
+    "wban": "99999",
+    "name": "ROVANIEMI",
+    "country": "FI",
+    "lat": 66.565,
+    "lon": 25.83,
+    "first_day": "19730101",
+    "last_day": "20210920",
+    "distance_km": 8.1
+  },
+  {
+    "usaf": "028130",
+    "wban": "99999",
+    "name": "ROVANIEMI APUKKA",
+    "country": "FI",
+    "lat": 66.583,
+    "lon": 26.017,
+    "first_day": "20080115",
+    "last_day": "20210920",
+    "distance_km": 15.5
+  }
+]

@@ -1,0 +1,46 @@
+[
+  {
+    "usaf": "010260",
+    "wban": "99999",
+    "name": "TROMSO",
+    "country": "NO",
+    "lat": 69.65,
+    "lon": 18.933,
+    "first_day": "19970201",
+    "last_day": "20210920",
+    "distance_km": 0.9
+  },
+  {
+    "usaf": "010270",
+    "wban": "99999",
+    "name": "TROMSO-HOLT",
+    "country": "NO",
+    "lat": 69.65,
+    "lon": 18.9,
+    "first_day": "20110928",
+    "last_day": "20210920",
+    "distance_km": 2.2
+  },
+  {
+    "usaf": "010250",
+    "wban": "99999",
+    "name": "TROMSO",
+    "country": "NO",
+    "lat": 69.683,
+    "lon": 18.919,
+    "first_day": "19730101",
+    "last_day": "20210920",
+    "distance_km": 4.0
+  },
+  {
+    "usaf": "010303",
+    "wban": "99999",
+    "name": "TROMSO/SKATTURA",
+    "country": "NO",
+    "lat": 69.7,
+    "lon": 19.017,
+    "first_day": "20140522",
+    "last_day": "20150108",
+    "distance_km": 6.1
+  }
+]

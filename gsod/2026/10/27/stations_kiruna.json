@@ -1,0 +1,35 @@
+[
+  {
+    "usaf": "020440",
+    "wban": "99999",
+    "name": "KIRUNA",
+    "country": "SW",
+    "lat": 67.822,
+    "lon": 20.337,
+    "first_day": "19770701",
+    "last_day": "20210920",
+    "distance_km": 6.0
+  },
+  {
+    "usaf": "020450",
+    "wban": "99999",
+    "name": "KIRUNA-SOL",
+    "country": "SW",
+    "lat": 67.833,
+    "lon": 20.417,
+    "first_day": "19950401",
+    "last_day": "20030922",
+    "distance_km": 8.4
+  },
+  {
+    "usaf": "020310",
+    "wban": "99999",
+    "name": "RENSJON",
+    "country": "SW",
+    "lat": 68.067,
+    "lon": 19.833,
+    "first_day": "20010601",
+    "last_day": "20210920",
+    "distance_km": 28.6
+  }
+]
