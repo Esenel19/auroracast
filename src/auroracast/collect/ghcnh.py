@@ -32,7 +32,7 @@ import math
 import sys
 from collections import Counter
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
@@ -275,16 +275,17 @@ def cloud_quality(text: str, year: int, current_year: int | None = None) -> dict
         if oktas is None or not raw_date:
             continue
         try:
-            when = datetime.fromisoformat(raw_date[:19])
+            when = datetime.fromisoformat(raw_date[:19]).replace(tzinfo=UTC)  # GHCNh : heures UTC
         except ValueError:
             continue
         hours.add(when.replace(minute=0, second=0))
         distribution[oktas] += 1
     ordered = sorted(hours)
     gaps = [(b - a).total_seconds() / 3600 for a, b in itertools.pairwise(ordered)]
-    expected = (datetime(year + 1, 1, 1) - datetime(year, 1, 1)).days * 24
+    year_start = datetime(year, 1, 1, tzinfo=UTC)
+    expected = (datetime(year + 1, 1, 1, tzinfo=UTC) - year_start).days * 24
     if year == current_year and ordered:  # année en cours : jusqu'à la dernière observation
-        expected = int((ordered[-1] - datetime(year, 1, 1)).total_seconds() // 3600) + 1
+        expected = int((ordered[-1] - year_start).total_seconds() // 3600) + 1
     share = round(len(hours) / expected, 3) if expected else 0.0
     report = {
         "year": year,
