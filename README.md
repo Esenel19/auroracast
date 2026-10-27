@@ -216,7 +216,7 @@ les API qui comptent les requêtes), et le résultat est noté dans le manifeste
 | [GFZ Potsdam](https://kp.gfz.de/) | Historique du Kp depuis 1932 | CC BY 4.0 (taches solaires WDC-SILSO : CC BY-NC 4.0) ; citer Matzka et al. (2021), DOI 10.5880/Kp.0001 |
 | [OMNIWeb, NASA SPDF](https://omniweb.gsfc.nasa.gov/) | Vent solaire et IMF horaires | Citer OMNI Hourly Data, DOI 10.48322/1shr-ht18, avec la date d'accès |
 | [NOAA GHCNh](https://www.ncei.noaa.gov/products/global-historical-climatology-network-hourly) | Nébulosité observée par les stations | CC0 ; citer NOAA NCEI, GHCNh Version 1, DOI 10.25921/jp3d-3v19 |
-| [NOAA GSOD sur BigQuery](https://console.cloud.google.com/marketplace/product/noaa-public/gsod) | Relevés météo quotidiens (2010 → 24/08/2025) | Données NOAA du domaine public, hébergées dans les jeux publics Google BigQuery |
+| NOAA GSOD sur BigQuery (`bigquery-public-data.noaa_gsod`) | Relevés météo quotidiens (2010 → 24/08/2025) | Données NOAA du domaine public, hébergées dans les jeux publics Google BigQuery |
 
 Bonnes pratiques de collecte : User-Agent identifiable, nouvelles tentatives espacées,
 au plus une collecte par heure, aucune image ni graphique collecté.
