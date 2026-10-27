@@ -13,7 +13,7 @@ import logging
 import sys
 from pathlib import Path
 
-from auroracast.transform import space_weather, weather
+from auroracast.transform import gsod, space_weather, weather
 
 log = logging.getLogger("auroracast.transform")
 
@@ -21,6 +21,7 @@ log = logging.getLogger("auroracast.transform")
 def to_markdown(report: dict) -> str:
     report = dict(report)
     clouds = report.pop("cloud_hourly", None)
+    daily = report.pop("weather_daily", None)
     lines = ["## Tables propres (météo de l'espace)", "",
              "| Table | Lignes | Début | Fin | Périodes manquantes | Sources |",
              "| --- | --- | --- | --- | --- | --- |"]
@@ -40,6 +41,20 @@ def to_markdown(report: dict) -> str:
         for loc, q in clouds["locations"].items():
             lines.append(f"| {loc} | {q['station_id']} | {q['start'][:10]} | {q['end'][:10]} | "
                          f"{q['cloud_share']:.0%} | {q['clear_share']:.0%} | {q['obscured_hours']} |")
+    if daily and daily.get("locations"):
+        lines += ["", "## Météo quotidienne observée (NOAA GSOD, requêtes SQL BigQuery)", "",
+                  ("| Lieu | Station | Début | Fin | Jours manquants | Visibilité absente | "
+                   "Précipitations absentes | Jours de brouillard |"),
+                  "| --- | --- | --- | --- | --- | --- | --- | --- |"]
+        for loc, q in daily["locations"].items():
+            ms = q["missing_share"]
+            lines.append(f"| {loc} | {q['station_name']} | {q['start']} | {q['end']} | "
+                         f"{q['missing_days']} | {ms['visibility_km']:.1%} | "
+                         f"{ms['precip_mm']:.1%} | {q['fog_days']} |")
+        lines.append(f"\nValeurs hors bornes écartées : {daily.get('out_of_bounds') or 'aucune'} ; "
+                     f"jours min/moy/max incohérents : {daily.get('temp_incoherent_days')}.")
+    elif daily and daily.get("error"):
+        lines += ["", f"Météo quotidienne GSOD : {daily['error']}"]
     return "\n".join(lines)
 
 
@@ -55,6 +70,9 @@ def main(argv: list[str] | None = None) -> int:
     weather_tables, weather_report = weather.build(args.raw)
     tables.update(weather_tables)
     report.update(weather_report)
+    daily_tables, daily_report = gsod.build(args.raw)
+    tables.update(daily_tables)
+    report.update(daily_report)
     args.out.mkdir(parents=True, exist_ok=True)
     for name, df in tables.items():
         df.to_parquet(args.out / f"{name}.parquet", index=False)
