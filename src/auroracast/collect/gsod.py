@@ -130,7 +130,7 @@ def _job_config(params: dict, dry_run: bool):
             query_params.append(bigquery.ScalarQueryParameter(name, "STRING", value))
     return bigquery.QueryJobConfig(
         query_parameters=query_params, dry_run=dry_run, use_query_cache=False,
-        maximum_bytes_billed=None if dry_run else MAX_BYTES_BILLED,
+        maximum_bytes_billed=MAX_BYTES_BILLED,  # jamais None : l'API refuse la valeur "None"
         labels={"application": "auroracast"})
 
 

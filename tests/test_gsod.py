@@ -131,3 +131,11 @@ def test_collect_records_client_failure(tmp_path):
     records = gsod.collect(tmp_path, client_factory=broken, now=lambda: FIXED,
                            job_config=fake_config)
     assert records[0]["source"] == "gsod_client" and "introuvable" in records[0]["error"]
+
+
+def test_real_job_config_always_sets_a_numeric_cap():
+    pytest.importorskip("google.cloud.bigquery")
+    for dry in (True, False):
+        cfg = gsod._job_config({"lat": 1.0, "stations": ["020440"]}, dry)
+        assert cfg.maximum_bytes_billed == gsod.MAX_BYTES_BILLED
+        assert cfg.to_api_repr()["query"]["maximumBytesBilled"] == str(gsod.MAX_BYTES_BILLED)
