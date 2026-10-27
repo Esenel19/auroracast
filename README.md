@@ -168,6 +168,20 @@ bornes physiques mises à NaN et comptées ; une ligne par période ; grille hor
 pour le vent solaire (un trou est une ligne `source = absent`) ; Kp jamais interpolé ; vent
 solaire interpolé linéairement sur 2 h au plus (`interpolated = True`).
 
+### Visualiser les tables (VS Code)
+
+Récupérer les tables propres une fois, depuis le dossier du projet :
+
+```powershell
+git fetch origin clean-data
+git worktree add data/clean clean-data
+```
+
+Puis ouvrir `notebooks/01_exploration_meteo_espace.ipynb` dans VS Code (extensions *Python* et
+*Jupyter*) et cliquer sur *Run All*. Pour parcourir une table comme dans un tableur, clic
+droit sur un fichier `.parquet` de `data/clean` > *Open in Data Wrangler* (extension Microsoft
+*Data Wrangler*). Mise à jour des tables : `git -C data/clean pull origin clean-data`.
+
 ## Respect des sites (robots.txt)
 
 Tous les collecteurs passent par `auroracast.collect.web.PoliteSession`, qui lit le robots.txt
