@@ -179,8 +179,9 @@ git fetch origin clean-data
 git worktree add data/clean clean-data
 ```
 
-Puis ouvrir `notebooks/01_exploration_meteo_espace.ipynb` (météo de l'espace) ou
-`notebooks/02_exploration_nuages.ipynb` (nébulosité) dans VS Code (extensions *Python* et
+Puis ouvrir `notebooks/01_exploration_meteo_espace.ipynb` (météo de l'espace),
+`notebooks/02_exploration_nuages.ipynb` (nébulosité) ou `notebooks/03_exploration_meteo_sol.ipynb`
+(vue d'ensemble des tables propres et météo au sol GSOD) dans VS Code (extensions *Python* et
 *Jupyter*) et cliquer sur *Run All*. Pour parcourir une table comme dans un tableur, clic
 droit sur un fichier `.parquet` de `data/clean` > *Open in Data Wrangler* (extension Microsoft
 *Data Wrangler*). Mise à jour des tables : `git -C data/clean fetch origin clean-data` puis `git -C data/clean reset --hard origin/clean-data` (pas de `pull` : la branche est republiée à chaque transformation).
