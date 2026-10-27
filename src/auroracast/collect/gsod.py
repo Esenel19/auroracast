@@ -49,21 +49,35 @@ MAX_KM = 30.0
 LAST_YEAR = 2025                  # dernière table annuelle publiée
 
 SQL_STATIONS = f"""
--- Stations GSOD les plus proches d'un lieu (distance géodésique calculée par BigQuery)
+-- Stations GSOD les plus proches d'un lieu (distance géodésique calculée par BigQuery).
+-- La colonne `end` de la table stations n'est plus mise à jour (figée au 20/09/2021) :
+-- l'activité réelle est lue dans les relevés de la dernière année (jointure externe).
+WITH recent AS (
+  SELECT stn, wban,
+         MAX(DATE(CAST(year AS INT64), CAST(mo AS INT64), CAST(da AS INT64))) AS last_obs,
+         COUNT(*) AS days_last_year
+  FROM `{DATASET}.gsod*`
+  WHERE _TABLE_SUFFIX = @last_year
+  GROUP BY stn, wban
+)
 SELECT
-  usaf,
-  wban,
-  name,
-  country,
-  lat,
-  lon,
-  `begin` AS first_day,
-  `end`   AS last_day,
-  ROUND(ST_DISTANCE(ST_GEOGPOINT(lon, lat), ST_GEOGPOINT(@lon, @lat)) / 1000, 1) AS distance_km
-FROM `{DATASET}.stations`
-WHERE lat IS NOT NULL
-  AND lon IS NOT NULL
-  AND ST_DWITHIN(ST_GEOGPOINT(lon, lat), ST_GEOGPOINT(@lon, @lat), @max_m)
+  s.usaf,
+  s.wban,
+  s.name,
+  s.country,
+  s.lat,
+  s.lon,
+  s.`begin` AS first_day,
+  s.`end`   AS last_day,
+  r.last_obs,
+  IFNULL(r.days_last_year, 0) AS days_last_year,
+  ROUND(ST_DISTANCE(ST_GEOGPOINT(s.lon, s.lat), ST_GEOGPOINT(@lon, @lat)) / 1000, 1) AS distance_km
+FROM `{DATASET}.stations` AS s
+LEFT JOIN recent AS r
+  ON r.stn = s.usaf AND r.wban = s.wban
+WHERE s.lat IS NOT NULL
+  AND s.lon IS NOT NULL
+  AND ST_DWITHIN(ST_GEOGPOINT(s.lon, s.lat), ST_GEOGPOINT(@lon, @lat), @max_m)
 ORDER BY distance_km
 LIMIT 10
 """
@@ -147,10 +161,19 @@ def run_query(client, sql: str, params: dict, job_config: Callable = _job_config
     return rows, trace
 
 
+MIN_DAYS_LAST_YEAR = 30           # une station « active » a au moins 30 jours de relevés
+
+
 def select_station(candidates: list[dict], end_year: int, max_km: float = MAX_KM) -> dict | None:
-    """La station la plus proche, à moins de max_km, encore active la dernière année demandée."""
-    ok = [c for c in candidates
-          if c["distance_km"] <= max_km and str(c.get("last_day") or "") >= f"{end_year}0101"]
+    """La station la plus proche, à moins de max_km, avec des relevés la dernière année
+    demandée (days_last_year, calculé dans les données). Sans cette colonne, on se rabat
+    sur la date de fin de la table stations."""
+    def active(c: dict) -> bool:
+        if "days_last_year" in c:
+            return int(c["days_last_year"] or 0) >= MIN_DAYS_LAST_YEAR
+        return str(c.get("last_day") or "") >= f"{end_year}0101"
+
+    ok = [c for c in candidates if c["distance_km"] <= max_km and active(c)]
     return min(ok, key=lambda c: c["distance_km"]) if ok else None
 
 
@@ -229,7 +252,8 @@ def collect(
                "collected_at": now().isoformat(), "ok": False}
         try:
             cands, trace = run_query(client, SQL_STATIONS,
-                                     {"lat": loc.lat, "lon": loc.lon, "max_m": int(MAX_KM * 1000)},
+                                     {"lat": loc.lat, "lon": loc.lon, "max_m": int(MAX_KM * 1000),
+                                      "last_year": str(end_year)},
                                      job_config)
             rec.update(trace)
             path = day_dir / f"stations_{loc.name}.json"

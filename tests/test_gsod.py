@@ -57,6 +57,16 @@ DAILY = [
 ]
 
 
+def test_select_station_uses_real_activity_over_stale_metadata():
+    stale = [  # table stations figée au 20/09/2021, mais relevés réels en 2025
+        {"usaf": "010260", "distance_km": 0.9, "last_day": "20210920", "days_last_year": 236},
+        {"usaf": "010250", "distance_km": 4.0, "last_day": "20210920", "days_last_year": 5},
+    ]
+    assert gsod.select_station(stale, 2025)["usaf"] == "010260"
+    stale[0]["days_last_year"] = 0
+    assert gsod.select_station(stale, 2025) is None
+
+
 def test_select_station_skips_closed_and_far_stations():
     assert gsod.select_station(STATIONS, 2025)["usaf"] == "020440"
     assert gsod.select_station(STATIONS[:1], 2025) is None
@@ -94,9 +104,11 @@ def test_collect_archives_sql_results_and_manifest(tmp_path):
     sql_call = [c for c in client.calls if "gsod*" in c[0]][-1][1]
     assert sql_call["params"] == {"first_year": "2010", "last_year": "2025",
                                   "stations": ["020440"]}
+    station_call = [c for c in client.calls if "ST_DISTANCE" in c[0]][-1][1]
+    assert station_call["params"]["last_year"] == "2025"
     text = gzip.decompress((tmp_path / daily["file"]).read_bytes()).decode()
     assert text.splitlines()[0].startswith("stn,station_name,day") and "2025-01-03" in text
-    assert (tmp_path / "gsod/2026/10/27/requetes.sql").read_text().count("SELECT") == 2
+    assert (tmp_path / "gsod/2026/10/27/requetes.sql").read_text().count("-- 2. Relevés") == 1
     manifest = tmp_path / "gsod/manifests/2026/10/27/run_20261027T100000Z.jsonl"
     assert len(manifest.read_text().splitlines()) == 2
     assert json.loads((tmp_path / by["gsod_stations_kiruna"]["file"]).read_text())[1]["usaf"] == "020440"
