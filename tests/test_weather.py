@@ -20,7 +20,7 @@ def test_to_hourly_keeps_observation_closest_to_the_hour():
                                     "2025-01-01T03:10"], utc=True),
         "oktas": [1.0, 7.0, 3.0, 8.0], "obscured": [False, False, False, True]})
     h = weather.to_hourly(obs).set_index("time")
-    t = lambda s: pd.Timestamp(s, tz="UTC")
+    t = lambda s: pd.Timestamp(s, tz="UTC")  # noqa: E731
     assert h.loc[t("2025-01-01 00:00"), "oktas"] == 1.0      # 00:20 -> 00 h
     assert h.loc[t("2025-01-01 01:00"), "oktas"] == 3.0      # 01:00 bat 00:50
     assert h.loc[t("2025-01-01 01:00"), "n_obs"] == 2

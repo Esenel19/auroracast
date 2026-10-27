@@ -108,12 +108,12 @@ def test_collect_archives_sql_results_and_manifest(tmp_path):
     assert station_call["params"]["last_year"] == "2025"
     text = gzip.decompress((tmp_path / daily["file"]).read_bytes()).decode()
     assert text.splitlines()[0].startswith("stn,station_name,day") and "2025-01-03" in text
-    assert (tmp_path / "gsod/2026/10/27/requetes.sql").read_text().count("-- 2. Relevés") == 1
+    assert (tmp_path / "gsod/2026/10/27/requetes.sql").read_text(encoding="utf-8").count("-- 2. Relevés") == 1
     manifest = tmp_path / "gsod/manifests/2026/10/27/run_20261027T100000Z.jsonl"
-    lines = manifest.read_text().splitlines()
+    lines = manifest.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 2
     assert json.loads(lines[0])["station"]["last_obs"] == "2025-08-24"   # date -> texte ISO
-    assert json.loads((tmp_path / by["gsod_stations_kiruna"]["file"]).read_text())[1]["usaf"] == "020440"
+    assert json.loads((tmp_path / by["gsod_stations_kiruna"]["file"]).read_text(encoding="utf-8"))[1]["usaf"] == "020440"
     assert "KIRUNA (USAF 020440, 6.0 km)" in gsod.to_markdown(records)
 
 
