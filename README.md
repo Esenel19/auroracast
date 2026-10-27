@@ -162,6 +162,8 @@ Toutes les données brutes de `raw-data` sont relues et les tables sont publiée
 | `solar_daily` | jour | `date`, `Ap`, `sn`, `f107_obs`, `f107_adj`, `sn_status` | GFZ |
 | `solar_wind_hourly` | 1 h | `time`, `bt`, `by_gsm`, `bz_gsm`, `density`, `speed`, `bz_min`, `speed_max`, `source`, `interpolated` | OMNIWeb, puis NOAA RTSW (satellite actif, moyenne horaire si au moins 15 min de mesures) |
 | `kp_forecast` | prévision | `issued_at`, `target_time`, `kp`, `lead_hours` | NOAA (valeurs « predicted », date d'émission = collecte où elles apparaissent) |
+| `locations` | lieu | `location`, `lat`, `lon`, `station_id`, `station_name`, `station_distance_km` | `locations.py` + `data/stations.json` |
+| `cloud_hourly` | lieu × 1 h | `location`, `time`, `oktas`, `cloud_cover_pct`, `obscured`, `n_obs`, `offset_min`, `station_id`, `source` | NOAA GHCNh : observation la plus proche de l'heure pile, jamais interpolée |
 
 Règles : temps en UTC (début de période) ; codes d'absence convertis en NaN ; valeurs hors
 bornes physiques mises à NaN et comptées ; une ligne par période ; grille horaire continue
@@ -177,7 +179,8 @@ git fetch origin clean-data
 git worktree add data/clean clean-data
 ```
 
-Puis ouvrir `notebooks/01_exploration_meteo_espace.ipynb` dans VS Code (extensions *Python* et
+Puis ouvrir `notebooks/01_exploration_meteo_espace.ipynb` (météo de l'espace) ou
+`notebooks/02_exploration_nuages.ipynb` (nébulosité) dans VS Code (extensions *Python* et
 *Jupyter*) et cliquer sur *Run All*. Pour parcourir une table comme dans un tableur, clic
 droit sur un fichier `.parquet` de `data/clean` > *Open in Data Wrangler* (extension Microsoft
 *Data Wrangler*). Mise à jour des tables : `git -C data/clean pull origin clean-data`.

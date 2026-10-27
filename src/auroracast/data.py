@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pandas as pd
 
-TABLES = ("kp_3h", "solar_daily", "solar_wind_hourly", "kp_forecast")
+TABLES = ("kp_3h", "solar_daily", "solar_wind_hourly", "kp_forecast", "locations", "cloud_hourly")
 
 
 def clean_dir() -> Path:
