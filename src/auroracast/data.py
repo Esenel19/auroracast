@@ -15,10 +15,11 @@ from pathlib import Path
 import pandas as pd
 
 TABLES = ("kp_3h", "solar_daily", "solar_wind_hourly", "kp_forecast")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def clean_dir() -> Path:
-    return Path(os.getenv("AURORACAST_CLEAN_DIR", "data/clean"))
+    return Path(os.getenv("AURORACAST_CLEAN_DIR", PROJECT_ROOT / "data" / "clean"))
 
 
 def load(name: str, directory: Path | None = None) -> pd.DataFrame:
