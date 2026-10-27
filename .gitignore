@@ -9,6 +9,10 @@ venv/
 
 # Secrets
 .env
+*.json.key
+gha-creds-*.json
+*service-account*.json
+auroracast-*.json
 
 # Données : jamais dans Git (volumineuses, rejouables depuis le brut)
 data/*
