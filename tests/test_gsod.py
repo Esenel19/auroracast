@@ -101,3 +101,33 @@ def test_collect_archives_sql_results_and_manifest(tmp_path):
     assert len(manifest.read_text().splitlines()) == 2
     assert json.loads((tmp_path / by["gsod_stations_kiruna"]["file"]).read_text())[1]["usaf"] == "020440"
     assert "KIRUNA (USAF 020440, 6.0 km)" in gsod.to_markdown(records)
+
+
+def test_resolve_project_order(monkeypatch, tmp_path):
+    for var in ("GCP_PROJECT_ID", "GOOGLE_CLOUD_PROJECT", "CLOUDSDK_CORE_PROJECT",
+                "GOOGLE_APPLICATION_CREDENTIALS"):
+        monkeypatch.delenv(var, raising=False)
+    key = tmp_path / "cle.json"
+    key.write_text(json.dumps({"project_id": "depuis-la-cle"}))
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(key))
+    assert gsod.resolve_project() == "depuis-la-cle"
+    monkeypatch.setenv("GCP_PROJECT_ID", "   ")                  # variable vide : ignorée
+    assert gsod.resolve_project() == "depuis-la-cle"
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "auth-github")
+    assert gsod.resolve_project() == "auth-github"
+    monkeypatch.setenv("GCP_PROJECT_ID", "auroracast-512909")
+    assert gsod.resolve_project() == "auroracast-512909"
+    monkeypatch.delenv("GOOGLE_APPLICATION_CREDENTIALS")
+    for var in ("GCP_PROJECT_ID", "GOOGLE_CLOUD_PROJECT"):
+        monkeypatch.delenv(var)
+    with pytest.raises(RuntimeError, match="Variables"):
+        gsod.resolve_project()
+
+
+def test_collect_records_client_failure(tmp_path):
+    def broken():
+        raise RuntimeError("ID du projet Google Cloud introuvable")
+
+    records = gsod.collect(tmp_path, client_factory=broken, now=lambda: FIXED,
+                           job_config=fake_config)
+    assert records[0]["source"] == "gsod_client" and "introuvable" in records[0]["error"]

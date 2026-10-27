@@ -89,11 +89,30 @@ ORDER BY g.stn, day
 """
 
 
+def resolve_project(project: str | None = None) -> str:
+    """Projet qui exécute les requêtes : argument, sinon variable GCP_PROJECT_ID, sinon
+    projet de la clé du compte de service (GOOGLE_CLOUD_PROJECT, exporté par l'étape
+    d'authentification GitHub, ou champ project_id du fichier de clé)."""
+    for candidate in (project, os.getenv("GCP_PROJECT_ID"), os.getenv("GOOGLE_CLOUD_PROJECT"),
+                      os.getenv("CLOUDSDK_CORE_PROJECT")):
+        if candidate and candidate.strip():
+            return candidate.strip()
+    key = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    if key and Path(key).exists():
+        project_id = json.loads(Path(key).read_text(encoding="utf-8")).get("project_id")
+        if project_id:
+            return project_id
+    raise RuntimeError("ID du projet Google Cloud introuvable : définir la variable "
+                       "GCP_PROJECT_ID (onglet Variables de GitHub, pas Secrets)")
+
+
 def make_client(project: str | None = None):
     """Client BigQuery authentifié (import différé : les tests n'en ont pas besoin)."""
     from google.cloud import bigquery
 
-    return bigquery.Client(project=project or os.environ["GCP_PROJECT_ID"])
+    resolved = resolve_project(project)
+    log.info("projet Google Cloud : %s", resolved)
+    return bigquery.Client(project=resolved)
 
 
 def _job_config(params: dict, dry_run: bool):
@@ -196,7 +215,14 @@ def collect(
         "-- 1. Stations\n" + SQL_STATIONS.strip() + "\n\n-- 2. Relevés quotidiens\n"
         + SQL_DAILY.strip() + "\n", encoding="utf-8")
     records: list[dict] = []
-    client = client_factory()
+    try:
+        client = client_factory()
+    except Exception as exc:  # noqa: BLE001 - consigné dans le manifeste
+        records.append({"source": "gsod_client", "technique": "sql", "ok": False,
+                        "collected_at": now().isoformat(), "error": str(exc)})
+        log.error("client BigQuery : %s", exc)
+        write_run_manifest(out_dir, "gsod", records, started)
+        return records
     chosen: dict[str, dict] = {}
     for loc in locations:
         rec = {"source": f"gsod_stations_{loc.name}", "technique": "sql", "location": loc.name,
