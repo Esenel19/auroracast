@@ -44,7 +44,8 @@ from auroracast.locations import LOCATIONS, Location
 log = logging.getLogger("auroracast.collect.gsod")
 
 DATASET = "bigquery-public-data.noaa_gsod"
-MAX_BYTES_BILLED = 5 * 10**9      # plafond par requête : 5 Go (quota gratuit : 1 To / mois)
+MAX_BYTES_BILLED = 15 * 10**9     # plafond par requête : 15 Go (quota gratuit : 1 To / mois) ;
+                                  # relevés 2010-2025 des 3 stations : 8,7 Go estimés (oct. 2026)
 MAX_KM = 30.0
 LAST_YEAR = 2025                  # dernière table annuelle publiée
 
