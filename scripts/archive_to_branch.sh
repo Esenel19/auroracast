@@ -18,7 +18,7 @@ if git ls-remote --exit-code --heads origin "$BRANCH" > /dev/null; then
 else
   git worktree add --quiet --detach "$STORE"
   git -C "$STORE" checkout --quiet --orphan "$BRANCH"
-  git -C "$STORE" rm -r --quiet --force .
+  git -C "$STORE" rm -r --quiet --force --ignore-unmatch .
 fi
 
 cp -R "$SRC"/. "$STORE"/

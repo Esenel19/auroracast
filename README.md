@@ -21,7 +21,8 @@ Projet de certification **RNCP 39586** (Ingénieur en science des données), sp�
 
 ```
 auroracast/
-├── src/auroracast/collect/   # collecteurs (NOAA pour l'instant)
+├── src/auroracast/collect/   # collecteurs (NOAA, GFZ, OMNIWeb, GHCNh)
+├── src/auroracast/transform/ # nettoyage : données brutes -> tables propres
 ├── dags/                     # DAGs Airflow (à venir)
 ├── tests/                    # tests pytest
 ├── notebooks/                # analyses exploratoires
@@ -144,6 +145,28 @@ rapport de qualité : heures couvertes par une observation de nuages, répartiti
 plus long trou entre deux observations. Décodage : la couche la plus couverte parmi
 `sky_cover_layer_1` à `4` (`CLR:00` dégagé … `OVC:08` couvert, `VV:09` ciel invisible compté
 8 octas), sinon la couverture totale de `sky_condition`.
+
+## Transformation : tables propres
+
+```powershell
+python -m auroracast.transform --raw data/raw --out data/clean --csv
+```
+
+Dans le cloud : *Actions* > « Transformation des données » (aussi chaque jour vers 06:23 UTC).
+Toutes les données brutes de `raw-data` sont relues et les tables sont publiées dans la branche
+**`clean-data`** (Parquet, un seul commit remplacé à chaque fois) avec `rapport_qualite.json`.
+
+| Table | Grain | Colonnes | Sources |
+| --- | --- | --- | --- |
+| `kp_3h` | 3 h | `time`, `kp`, `ap`, `status` (definitive, preliminary, noaa_estimated), `source` | GFZ, complété par la NOAA pour les tranches que le GFZ n'a pas encore publiées |
+| `solar_daily` | jour | `date`, `Ap`, `sn`, `f107_obs`, `f107_adj`, `sn_status` | GFZ |
+| `solar_wind_hourly` | 1 h | `time`, `bt`, `by_gsm`, `bz_gsm`, `density`, `speed`, `bz_min`, `speed_max`, `source`, `interpolated` | OMNIWeb, puis NOAA RTSW (satellite actif, moyenne horaire si au moins 15 min de mesures) |
+| `kp_forecast` | prévision | `issued_at`, `target_time`, `kp`, `lead_hours` | NOAA (valeurs « predicted », date d'émission = collecte où elles apparaissent) |
+
+Règles : temps en UTC (début de période) ; codes d'absence convertis en NaN ; valeurs hors
+bornes physiques mises à NaN et comptées ; une ligne par période ; grille horaire continue
+pour le vent solaire (un trou est une ligne `source = absent`) ; Kp jamais interpolé ; vent
+solaire interpolé linéairement sur 2 h au plus (`interpolated = True`).
 
 ## Respect des sites (robots.txt)
 

@@ -1,2 +1,4 @@
 requests>=2.31
 python-dotenv>=1.0
+pandas>=2.2
+pyarrow>=15

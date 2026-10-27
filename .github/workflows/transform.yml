@@ -1,0 +1,41 @@
+name: Transformation des données
+
+# Recalcule les tables propres (Kp, indices solaires, vent solaire, prévisions) à partir
+# de toutes les données brutes de la branche raw-data, et les publie dans la branche
+# clean-data (fichiers Parquet + rapport de qualité). La branche clean-data ne contient
+# qu'un seul commit, remplacé à chaque exécution.
+
+on:
+  schedule:
+    - cron: "23 6 * * *"   # chaque jour vers 06:23 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: transformation
+  cancel-in-progress: false
+
+jobs:
+  transform:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt && pip install -e .
+
+      - name: Récupérer les données brutes
+        run: |
+          git fetch --quiet --depth 1 origin raw-data
+          mkdir -p raw && git archive FETCH_HEAD | tar -x -C raw
+
+      - name: Construire les tables propres
+        run: python -m auroracast.transform --raw raw --out clean --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Publier dans la branche clean-data
+        run: scripts/publish_to_branch.sh clean clean-data "Tables propres"
