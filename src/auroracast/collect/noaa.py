@@ -26,7 +26,7 @@ import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import requests
@@ -46,7 +46,7 @@ class Source:
     name: str
     path: str
     technique: str  # "api" (JSON) ou "scraping" (texte non structuré)
-    window_hours: int | None = None  # ne garder que les N dernières heures (gros fichiers)
+    window_hours: int | None = None  # collecte incrémentale ; N h par défaut sans historique
 
     @property
     def url(self) -> str:
@@ -57,9 +57,12 @@ class Source:
         return Path(self.path).suffix.lstrip(".") or "txt"
 
 
-# Cadence conseillée : toutes les heures. Les fichiers temps réel du vent solaire
-# (RTSW, plusieurs Mo) sont réduits aux 3 dernières heures : de quoi rattraper
-# 2 exécutions manquées. Les recouvrements seront dédoublonnés au nettoyage.
+# Cadence : deux passages par heure (h17 et h47). Les fichiers temps réel du vent
+# solaire (RTSW, plusieurs Mo, environ 2 jours de mesures) sont collectés de façon
+# INCRÉMENTALE : chaque passage reprend après la dernière mesure déjà archivée (lue
+# dans les manifestes précédents), avec un petit recouvrement. Un passage sauté par
+# l'ordonnanceur ne fait donc perdre aucune mesure, tant que le trou reste plus court
+# que la profondeur du fichier. Sans historique, on garde les 3 dernières heures.
 SOURCES: tuple[Source, ...] = (
     Source("kp_observed", "/products/noaa-planetary-k-index.json", "api"),
     Source("kp_forecast", "/products/noaa-planetary-k-index-forecast.json", "api"),
@@ -122,18 +125,57 @@ def parse_time_tag(value: str) -> datetime:
     return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed
 
 
-def trim_window(content: bytes, now: datetime, hours: int) -> tuple[bytes, int, int]:
-    """Garde les enregistrements des N dernières heures d'une liste JSON d'objets
-    portant un « time_tag ». Les enregistrements gardés ne sont pas modifiés.
-    Renvoie (contenu, lignes gardées, lignes reçues)."""
+OVERLAP = timedelta(minutes=10)   # recouvrement avec le passage précédent
+STALE_AFTER = timedelta(hours=3)  # flux considéré comme arrêté au-delà
+
+
+def trim_since(content: bytes, cutoff: datetime, now: datetime) -> dict:
+    """Garde les enregistrements dont le time_tag est postérieur ou égal à cutoff,
+    sans les modifier. Renvoie le contenu réduit et de quoi tracer la couverture."""
     rows = json.loads(content)
     if not isinstance(rows, list) or not all(isinstance(r, dict) and "time_tag" in r for r in rows):
         raise ValueError("format inattendu : liste d'objets avec time_tag attendue")
-    cutoff = now.timestamp() - hours * 3600
-    kept = [r for r in rows if parse_time_tag(r["time_tag"]).timestamp() >= cutoff]
-    if not kept:
-        raise ValueError(f"aucune donnée sur les {hours} dernières heures (flux arrêté ?)")
-    return json.dumps(kept, ensure_ascii=False).encode(), len(kept), len(rows)
+    times = [parse_time_tag(r["time_tag"]) for r in rows]
+    if not times:
+        raise ValueError("fichier sans mesure")
+    newest, oldest = max(times), min(times)
+    if newest < now - STALE_AFTER:
+        raise ValueError(f"aucune donnée récente : dernière mesure {newest.isoformat()} (flux arrêté ?)")
+    kept = [r for r, t in zip(rows, times, strict=True) if t >= cutoff]
+    kept_times = [t for t in times if t >= cutoff]
+    return {
+        "content": json.dumps(kept, ensure_ascii=False).encode(),
+        "rows_kept": len(kept),
+        "rows_received": len(rows),
+        "since": cutoff.isoformat(),
+        "file_oldest": oldest.isoformat(),
+        "first_time_tag": min(kept_times).isoformat() if kept_times else None,
+        "last_time_tag": max(kept_times).isoformat() if kept_times else None,
+        # perte : le fichier NOAA ne remonte plus jusqu'à la reprise demandée
+        "lost_from": cutoff.isoformat() if oldest > cutoff + OVERLAP else None,
+        "lost_to": oldest.isoformat() if oldest > cutoff + OVERLAP else None,
+    }
+
+
+def last_time_tags(state_dir: Path | None, max_files: int = 300) -> dict[str, datetime]:
+    """Dernière mesure archivée par source, lue dans les manifestes des passages
+    précédents (les plus récents d'abord)."""
+    found: dict[str, datetime] = {}
+    if state_dir is None:
+        return found
+    manifests = sorted((state_dir / "noaa" / "manifests").glob("**/run_*.jsonl"), reverse=True)
+    for path in manifests[:max_files]:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            tag = rec.get("last_time_tag")
+            if rec.get("ok") and tag:
+                t = parse_time_tag(tag)
+                if rec["source"] not in found or t > found[rec["source"]]:
+                    found[rec["source"]] = t
+    return found
 
 
 def collect_one(
@@ -142,8 +184,10 @@ def collect_one(
     session: requests.Session,
     now: Callable[[], datetime] = utc_now,
     fetcher: Callable[..., requests.Response] = fetch,
+    since: datetime | None = None,
 ) -> dict:
-    """Télécharge une source, l'archive et renvoie la ligne de manifeste."""
+    """Télécharge une source, l'archive et renvoie la ligne de manifeste.
+    since : dernière mesure déjà archivée (collecte incrémentale des flux RTSW)."""
     started = now()
     record = {
         "source": source.name,
@@ -163,8 +207,18 @@ def collect_one(
         validate(source, content)
         if source.window_hours:
             record["bytes_received"] = len(content)
-            content, kept, total = trim_window(content, started, source.window_hours)
-            record.update(rows_kept=kept, rows_received=total)
+            cutoff = (since - OVERLAP) if since else started - timedelta(hours=source.window_hours)
+            trimmed = trim_since(content, cutoff, started)
+            content = trimmed.pop("content")
+            record.update(trimmed, incremental=since is not None)
+            if trimmed["lost_from"]:
+                log.warning("%s : mesures perdues du %s au %s", source.name,
+                            trimmed["lost_from"], trimmed["lost_to"])
+            if trimmed["rows_kept"] == 0:  # rien de nouveau depuis le passage précédent
+                record["last_time_tag"] = since.isoformat() if since else None
+                record.update(ok=True, file=None, bytes=0)
+                record["duration_s"] = round(time.monotonic() - t0, 3)
+                return record
         path = target_path(out_dir, source, started)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(content)
@@ -203,6 +257,7 @@ def run(
     out_dir: Path = DEFAULT_OUT,
     only: list[str] | None = None,
     run_manifest: bool = False,
+    state_dir: Path | None = None,
     session_factory: Callable[[], PoliteSession] = lambda: PoliteSession(USER_AGENT),
     **kwargs,
 ) -> list[dict]:
@@ -211,7 +266,9 @@ def run(
     if unknown:
         raise SystemExit(f"Sources inconnues : {', '.join(sorted(unknown))}")
     with session_factory() as session:
-        records = [collect_one(s, out_dir, session, **kwargs) for s in selected]
+        previous = last_time_tags(state_dir)
+        records = [collect_one(s, out_dir, session, since=previous.get(s.name), **kwargs)
+                   for s in selected]
     started = kwargs.get("now", utc_now)()
     append_manifest(out_dir, records, per_run=started if run_manifest else None)
     ok = sum(r["ok"] for r in records)
@@ -226,9 +283,12 @@ def main(argv: list[str] | None = None) -> int:
                         help="sources à collecter : " + ", ".join(s.name for s in SOURCES))
     parser.add_argument("--run-manifest", action="store_true",
                         help="un manifeste par exécution (mode cloud) au lieu du manifeste cumulé")
+    parser.add_argument("--state-dir", type=Path,
+                        help="dossier contenant les manifestes des passages précédents "
+                             "(collecte incrémentale du vent solaire)")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    records = run(args.out, args.only, run_manifest=args.run_manifest)
+    records = run(args.out, args.only, run_manifest=args.run_manifest, state_dir=args.state_dir)
     return 0 if all(r["ok"] for r in records) else 1
 
 

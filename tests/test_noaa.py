@@ -116,3 +116,66 @@ def test_run_records_robots_result_in_manifest(tmp_path):
     rec = noaa.run(tmp_path, only=["alerts"], now=lambda: FIXED,
                    session_factory=OfflineSession, fetcher=make_fetcher(body))[0]
     assert rec["robots"]["allowed"] is True
+
+
+# --- collecte incrémentale du vent solaire ---------------------------------
+
+RTSW_ROWS = [
+    {"time_tag": "2026-10-26T12:00:00", "bz_gsm": 0.5},
+    {"time_tag": "2026-10-26T16:55:00", "bz_gsm": -1.0},
+    {"time_tag": "2026-10-26T17:05:00", "bz_gsm": -2.0},
+    {"time_tag": "2026-10-26T18:59:00", "bz_gsm": -3.0},
+]
+
+
+def collect_rtsw(tmp_path, since):
+    return noaa.collect_one(rtsw_source(), tmp_path, session=None, now=lambda: FIXED,
+                            fetcher=make_fetcher(json.dumps(RTSW_ROWS).encode()), since=since)
+
+
+def test_incremental_resumes_after_last_archived_measure_with_overlap(tmp_path):
+    rec = collect_rtsw(tmp_path, since=datetime(2026, 10, 26, 17, 0, tzinfo=UTC))
+    assert rec["ok"] and rec["incremental"] is True
+    assert rec["since"] == "2026-10-26T16:50:00+00:00"           # 10 min de recouvrement
+    assert rec["rows_kept"] == 3 and rec["last_time_tag"] == "2026-10-26T18:59:00+00:00"
+    assert rec["lost_from"] is None                               # le fichier couvre le trou
+
+
+def test_incremental_flags_loss_when_file_no_longer_covers_the_gap(tmp_path):
+    rec = collect_rtsw(tmp_path, since=datetime(2026, 10, 25, 6, 0, tzinfo=UTC))
+    assert rec["rows_kept"] == 4
+    assert rec["lost_from"] == "2026-10-25T05:50:00+00:00"
+    assert rec["lost_to"] == "2026-10-26T12:00:00+00:00"
+
+
+def test_incremental_with_nothing_new_writes_no_file(tmp_path):
+    rec = collect_rtsw(tmp_path, since=datetime(2026, 10, 26, 19, 30, tzinfo=UTC))
+    assert rec["ok"] and rec["rows_kept"] == 0 and rec["file"] is None
+    assert rec["last_time_tag"] == "2026-10-26T19:30:00+00:00"   # reprise inchangée
+    assert not (tmp_path / "noaa" / "solar_wind_mag").exists()
+
+
+def test_last_time_tags_reads_most_recent_successful_manifests(tmp_path):
+    d = tmp_path / "noaa/manifests/2026/10/26"
+    d.mkdir(parents=True)
+    (d / "run_20261026T180000Z.jsonl").write_text(
+        json.dumps({"source": "solar_wind_mag", "ok": True,
+                    "last_time_tag": "2026-10-26T17:59:00+00:00"}) + "\n")
+    (d / "run_20261026T190000Z.jsonl").write_text(
+        json.dumps({"source": "solar_wind_mag", "ok": True,
+                    "last_time_tag": "2026-10-26T18:59:00+00:00"}) + "\n"
+        + json.dumps({"source": "solar_wind_plasma", "ok": False}) + "\n" + "pas du json\n")
+    tags = noaa.last_time_tags(tmp_path)
+    assert tags == {"solar_wind_mag": datetime(2026, 10, 26, 18, 59, tzinfo=UTC)}
+    assert noaa.last_time_tags(None) == {}
+
+
+def test_run_uses_state_dir_for_incremental_collection(tmp_path):
+    state = tmp_path / "state" / "noaa/manifests/2026/10/26"
+    state.mkdir(parents=True)
+    (state / "run_20261026T170000Z.jsonl").write_text(json.dumps(
+        {"source": "solar_wind_mag", "ok": True, "last_time_tag": "2026-10-26T17:00:00+00:00"}))
+    rec = noaa.run(tmp_path / "out", only=["solar_wind_mag"], state_dir=tmp_path / "state",
+                   now=lambda: FIXED, session_factory=OfflineSession,
+                   fetcher=make_fetcher(json.dumps(RTSW_ROWS).encode()))[0]
+    assert rec["incremental"] and rec["rows_kept"] == 3

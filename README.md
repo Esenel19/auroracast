@@ -82,9 +82,14 @@ Pour récupérer les données sur ton PC : `git fetch origin raw-data` puis
 **Passage à Azure plus tard** : ajouter le secret `AZURE_STORAGE_CONNECTION_STRING` ; les
 fichiers partiront aussi dans Azure Blob Storage (conteneur `raw`), sans autre changement.
 
-Points de vigilance : GitHub peut retarder ou sauter une exécution planifiée (chaque collecte du
-vent solaire garde les 3 dernières heures pour rattraper ces trous) et suspend les planifications
-d'un dépôt public resté 60 jours sans activité.
+**Fiabilité** : l'ordonnanceur de GitHub peut retarder ou supprimer des passages (incident
+INC-003 : 2 passages en 13 h la première nuit). La collecte est donc prévue pour se rattraper :
+deux passages par heure (h17 et h47), et le vent solaire temps réel est collecté de façon
+**incrémentale** (`--state-dir`) : chaque passage lit dans les manifestes précédents l'heure
+de la dernière mesure archivée (`last_time_tag`) et reprend à partir de là, avec 10 min de
+recouvrement. Si le fichier NOAA (environ 2 jours de profondeur) ne remonte plus assez loin,
+la perte est notée au manifeste (`lost_from`, `lost_to`). GitHub suspend aussi les
+planifications d'un dépôt public resté 60 jours sans activité.
 
 ### Collecte locale toutes les heures (option)
 
