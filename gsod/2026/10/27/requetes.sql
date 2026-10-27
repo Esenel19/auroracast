@@ -1,19 +1,33 @@
 -- 1. Stations
--- Stations GSOD les plus proches d'un lieu (distance géodésique calculée par BigQuery)
+-- Stations GSOD les plus proches d'un lieu (distance géodésique calculée par BigQuery).
+-- La colonne `end` de la table stations n'est plus mise à jour (figée au 20/09/2021) :
+-- l'activité réelle est lue dans les relevés de la dernière année (jointure externe).
+WITH recent AS (
+  SELECT stn, wban,
+         MAX(DATE(CAST(year AS INT64), CAST(mo AS INT64), CAST(da AS INT64))) AS last_obs,
+         COUNT(*) AS days_last_year
+  FROM `bigquery-public-data.noaa_gsod.gsod*`
+  WHERE _TABLE_SUFFIX = @last_year
+  GROUP BY stn, wban
+)
 SELECT
-  usaf,
-  wban,
-  name,
-  country,
-  lat,
-  lon,
-  `begin` AS first_day,
-  `end`   AS last_day,
-  ROUND(ST_DISTANCE(ST_GEOGPOINT(lon, lat), ST_GEOGPOINT(@lon, @lat)) / 1000, 1) AS distance_km
-FROM `bigquery-public-data.noaa_gsod.stations`
-WHERE lat IS NOT NULL
-  AND lon IS NOT NULL
-  AND ST_DWITHIN(ST_GEOGPOINT(lon, lat), ST_GEOGPOINT(@lon, @lat), @max_m)
+  s.usaf,
+  s.wban,
+  s.name,
+  s.country,
+  s.lat,
+  s.lon,
+  s.`begin` AS first_day,
+  s.`end`   AS last_day,
+  r.last_obs,
+  IFNULL(r.days_last_year, 0) AS days_last_year,
+  ROUND(ST_DISTANCE(ST_GEOGPOINT(s.lon, s.lat), ST_GEOGPOINT(@lon, @lat)) / 1000, 1) AS distance_km
+FROM `bigquery-public-data.noaa_gsod.stations` AS s
+LEFT JOIN recent AS r
+  ON r.stn = s.usaf AND r.wban = s.wban
+WHERE s.lat IS NOT NULL
+  AND s.lon IS NOT NULL
+  AND ST_DWITHIN(ST_GEOGPOINT(s.lon, s.lat), ST_GEOGPOINT(@lon, @lat), @max_m)
 ORDER BY distance_km
 LIMIT 10
 

@@ -8,6 +8,8 @@
     "lon": 18.933,
     "first_day": "19970201",
     "last_day": "20210920",
+    "last_obs": "2025-08-24",
+    "days_last_year": 236,
     "distance_km": 0.9
   },
   {
@@ -19,6 +21,8 @@
     "lon": 18.9,
     "first_day": "20110928",
     "last_day": "20210920",
+    "last_obs": "2025-08-24",
+    "days_last_year": 213,
     "distance_km": 2.2
   },
   {
@@ -30,6 +34,8 @@
     "lon": 18.919,
     "first_day": "19730101",
     "last_day": "20210920",
+    "last_obs": "2025-08-24",
+    "days_last_year": 236,
     "distance_km": 4.0
   },
   {
@@ -41,6 +47,8 @@
     "lon": 19.017,
     "first_day": "20140522",
     "last_day": "20150108",
+    "last_obs": null,
+    "days_last_year": 0,
     "distance_km": 6.1
   }
 ]
