@@ -11,6 +11,11 @@ def stamp(when: datetime) -> str:
     return when.strftime("%Y%m%dT%H%M%SZ")
 
 
+def _json_safe(value):
+    """Dates et autres objets non JSON (ex. lignes BigQuery) écrits en texte ISO."""
+    return value.isoformat() if hasattr(value, "isoformat") else str(value)
+
+
 def write_run_manifest(out_dir: Path, namespace: str, records: list[dict], started: datetime) -> Path:
     """Un manifeste JSONL par exécution : <out>/<namespace>/manifests/AAAA/MM/JJ/run_<stamp>.jsonl"""
     path = (out_dir / namespace / "manifests" / started.strftime("%Y/%m/%d")
@@ -18,5 +23,5 @@ def write_run_manifest(out_dir: Path, namespace: str, records: list[dict], start
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as fh:
         for rec in records:
-            fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+            fh.write(json.dumps(rec, ensure_ascii=False, default=_json_safe) + "\n")
     return path

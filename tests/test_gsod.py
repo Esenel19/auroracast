@@ -43,9 +43,9 @@ def fake_config(params, dry):
 
 STATIONS = [
     {"usaf": "020450", "wban": "99999", "name": "KIRUNA-SOL", "distance_km": 3.0,
-     "last_day": "20101231"},                                   # fermée avant la période
+     "last_day": "20101231", "last_obs": None, "days_last_year": 0},                                   # fermée avant la période
     {"usaf": "020440", "wban": "99999", "name": "KIRUNA", "distance_km": 6.0,
-     "last_day": "20250824"},
+     "last_day": "20250824", "last_obs": date(2025, 8, 24), "days_last_year": 236},
 ]
 DAILY = [
     {"stn": "020440", "station_name": "KIRUNA", "day": date(2025, 1, 1), "temp": 5.0,
@@ -110,7 +110,9 @@ def test_collect_archives_sql_results_and_manifest(tmp_path):
     assert text.splitlines()[0].startswith("stn,station_name,day") and "2025-01-03" in text
     assert (tmp_path / "gsod/2026/10/27/requetes.sql").read_text().count("-- 2. Relevés") == 1
     manifest = tmp_path / "gsod/manifests/2026/10/27/run_20261027T100000Z.jsonl"
-    assert len(manifest.read_text().splitlines()) == 2
+    lines = manifest.read_text().splitlines()
+    assert len(lines) == 2
+    assert json.loads(lines[0])["station"]["last_obs"] == "2025-08-24"   # date -> texte ISO
     assert json.loads((tmp_path / by["gsod_stations_kiruna"]["file"]).read_text())[1]["usaf"] == "020440"
     assert "KIRUNA (USAF 020440, 6.0 km)" in gsod.to_markdown(records)
 
