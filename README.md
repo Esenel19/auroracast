@@ -162,6 +162,8 @@ Toutes les données brutes de `raw-data` sont relues et les tables sont publiée
 | `solar_daily` | jour | `date`, `Ap`, `sn`, `f107_obs`, `f107_adj`, `sn_status` | GFZ |
 | `solar_wind_hourly` | 1 h | `time`, `bt`, `by_gsm`, `bz_gsm`, `density`, `speed`, `bz_min`, `speed_max`, `source`, `interpolated` | OMNIWeb, puis NOAA RTSW (satellite actif, moyenne horaire si au moins 15 min de mesures) |
 | `kp_forecast` | prévision | `issued_at`, `target_time`, `kp`, `lead_hours` | NOAA (valeurs « predicted », date d'émission = collecte où elles apparaissent) |
+| `locations` | lieu | `location`, `lat`, `lon`, `station_id`, `station_name`, `station_distance_km` | `locations.py` + `data/stations.json` |
+| `cloud_hourly` | lieu × 1 h | `location`, `time`, `oktas`, `cloud_cover_pct`, `obscured`, `n_obs`, `offset_min`, `station_id`, `source` | NOAA GHCNh : observation la plus proche de l'heure pile, jamais interpolée |
 
 Règles : temps en UTC (début de période) ; codes d'absence convertis en NaN ; valeurs hors
 bornes physiques mises à NaN et comptées ; une ligne par période ; grille horaire continue
@@ -177,10 +179,27 @@ git fetch origin clean-data
 git worktree add data/clean clean-data
 ```
 
-Puis ouvrir `notebooks/01_exploration_meteo_espace.ipynb` dans VS Code (extensions *Python* et
+Puis ouvrir `notebooks/01_exploration_meteo_espace.ipynb` (météo de l'espace) ou
+`notebooks/02_exploration_nuages.ipynb` (nébulosité) dans VS Code (extensions *Python* et
 *Jupyter*) et cliquer sur *Run All*. Pour parcourir une table comme dans un tableur, clic
 droit sur un fichier `.parquet` de `data/clean` > *Open in Data Wrangler* (extension Microsoft
-*Data Wrangler*). Mise à jour des tables : `git -C data/clean pull origin clean-data`.
+*Data Wrangler*). Mise à jour des tables : `git -C data/clean fetch origin clean-data` puis `git -C data/clean reset --hard origin/clean-data` (pas de `pull` : la branche est republiée à chaque transformation).
+
+### Collecte par requêtes SQL (Google BigQuery, NOAA GSOD)
+
+Base existante interrogée en SQL : `bigquery-public-data.noaa_gsod` (relevés quotidiens :
+visibilité, brouillard, précipitations, neige, température, vent). Elle s'arrête au
+24/08/2025 et sert donc d'historique. Deux requêtes paramétrées (`collect/gsod.py`) :
+stations les plus proches de chaque lieu (`ST_GEOGPOINT`, `ST_DISTANCE`, `ST_DWITHIN`),
+puis relevés 2010-2025 en une requête sur la table générique `gsod*` (`_TABLE_SUFFIX`) avec
+jointure sur `stations`. Chaque requête est estimée à blanc (gratuit) puis exécutée avec un
+plafond de 5 Go facturés ; le texte SQL, les octets traités et l'identifiant du job sont
+archivés avec les résultats (`gsod/AAAA/MM/JJ/`).
+
+Mise en route : projet Google Cloud en mode sandbox (gratuit, sans carte bancaire), compte
+de service avec le seul rôle *Utilisateur de job BigQuery*, puis sur GitHub le secret
+`GCP_SA_KEY` (contenu de la clé JSON) et la variable `GCP_PROJECT_ID`. Lancement :
+*Backfill historique*, source `gsod`. Ne jamais commiter la clé JSON.
 
 ## Respect des sites (robots.txt)
 
@@ -197,6 +216,7 @@ les API qui comptent les requêtes), et le résultat est noté dans le manifeste
 | [GFZ Potsdam](https://kp.gfz.de/) | Historique du Kp depuis 1932 | CC BY 4.0 (taches solaires WDC-SILSO : CC BY-NC 4.0) ; citer Matzka et al. (2021), DOI 10.5880/Kp.0001 |
 | [OMNIWeb, NASA SPDF](https://omniweb.gsfc.nasa.gov/) | Vent solaire et IMF horaires | Citer OMNI Hourly Data, DOI 10.48322/1shr-ht18, avec la date d'accès |
 | [NOAA GHCNh](https://www.ncei.noaa.gov/products/global-historical-climatology-network-hourly) | Nébulosité observée par les stations | CC0 ; citer NOAA NCEI, GHCNh Version 1, DOI 10.25921/jp3d-3v19 |
+| NOAA GSOD sur BigQuery (`bigquery-public-data.noaa_gsod`) | Relevés météo quotidiens (2010 → 24/08/2025) | Données NOAA du domaine public, hébergées dans les jeux publics Google BigQuery |
 
 Bonnes pratiques de collecte : User-Agent identifiable, nouvelles tentatives espacées,
 au plus une collecte par heure, aucune image ni graphique collecté.

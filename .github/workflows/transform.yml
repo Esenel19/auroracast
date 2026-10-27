@@ -1,6 +1,7 @@
 name: Transformation des données
 
-# Recalcule les tables propres (Kp, indices solaires, vent solaire, prévisions) à partir
+# Recalcule les tables propres (Kp, indices solaires, vent solaire, prévisions, nébulosité,
+# météo quotidienne GSOD) à partir
 # de toutes les données brutes de la branche raw-data, et les publie dans la branche
 # clean-data (fichiers Parquet + rapport de qualité). La branche clean-data ne contient
 # qu'un seul commit, remplacé à chaque exécution.

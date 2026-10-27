@@ -3,8 +3,10 @@
 Récupérer les tables sur son PC, une seule fois, depuis le dossier du projet :
     git fetch origin clean-data
     git worktree add data/clean clean-data
-Puis, pour les mettre à jour :
-    git -C data/clean pull origin clean-data   (ou : git -C data/clean fetch origin && git -C data/clean reset --hard origin/clean-data)
+Puis, pour les mettre à jour (PAS de « pull » : la branche est republiée en un seul commit
+à chaque transformation, Git refuserait de fusionner des historiques sans lien) :
+    git -C data/clean fetch origin clean-data
+    git -C data/clean reset --hard origin/clean-data
 """
 
 from __future__ import annotations
@@ -14,7 +16,8 @@ from pathlib import Path
 
 import pandas as pd
 
-TABLES = ("kp_3h", "solar_daily", "solar_wind_hourly", "kp_forecast")
+TABLES = ("kp_3h", "solar_daily", "solar_wind_hourly", "kp_forecast", "locations", "cloud_hourly",
+          "weather_daily")
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
