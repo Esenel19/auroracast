@@ -5,10 +5,18 @@ name: Transformation des données
 # de toutes les données brutes de la branche raw-data, et les publie dans la branche
 # clean-data (fichiers Parquet + rapport de qualité). La branche clean-data ne contient
 # qu'un seul commit, remplacé à chaque exécution.
+#
+# Enchaînement : la transformation démarre dès que la collecte GHCNh du matin a RÉUSSI
+# (déclenchement workflow_run) ; la chaîne collecte -> transformation -> chargement de
+# l'entrepôt a donc des dépendances explicites. L'heure fixe de 09:23 UTC reste en secours
+# si la collecte n'a pas tourné ou a échoué.
 
 on:
+  workflow_run:
+    workflows: ["Collecte météo GHCNh (quotidienne)"]
+    types: [completed]
   schedule:
-    - cron: "23 6 * * *"   # chaque jour vers 06:23 UTC
+    - cron: "23 9 * * *"   # secours, chaque jour vers 09:23 UTC
   workflow_dispatch:
 
 permissions:
@@ -20,6 +28,8 @@ concurrency:
 
 jobs:
   transform:
+    # après la collecte : seulement si elle a réussi
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:

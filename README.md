@@ -160,7 +160,7 @@ Ko par jour au lieu de près de 1 Mo (environ 340 Mo par an évités dans `raw-d
 python -m auroracast.transform --raw data/raw --out data/clean --csv
 ```
 
-Dans le cloud : *Actions* > « Transformation des données » (aussi chaque jour vers 06:23 UTC).
+Dans le cloud : *Actions* > « Transformation des données ». Elle démarre automatiquement dès que la collecte GHCNh du matin (vers 05:37 UTC) a réussi, avec 09:23 UTC en secours.
 Toutes les données brutes de `raw-data` sont relues et les tables sont publiées dans la branche
 **`clean-data`** (Parquet, un seul commit remplacé à chaque fois) avec `rapport_qualite.json`.
 

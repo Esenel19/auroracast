@@ -5,7 +5,7 @@ name: Collecte météo GHCNh (quotidienne)
 # en cours est re-téléchargé, mais seules les lignes postérieures à la dernière
 # observation déjà archivée (6 h de recouvrement) sont gardées dans la branche raw-data :
 # quelques Ko par jour au lieu de près de 1 Mo.
-# Passe vers 05:37 UTC, avant la transformation de 06:23 UTC qui publie les tables propres.
+# Passe vers 05:37 UTC ; sa réussite déclenche la transformation (tables propres + entrepôt).
 
 on:
   schedule:
