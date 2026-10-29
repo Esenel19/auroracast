@@ -21,43 +21,28 @@ Toutes les heures sont en UTC. Tables propres publiées chaque jour (branche `cl
 
 **Question :** une belle aurore (Kp ≥ 4) aura-t-elle lieu dans les 24 prochaines heures ?
 
-**Cible :** $y_t = 1$ si $\max \mathrm{Kp}$ sur $]t,\ t+24\,\mathrm{h}]$ $\geq 4$, sinon $0$ (table `kp_3h`). Fréquence depuis 2010 : 21,6 % des jours.
-
-**Variables d'entrée, connues à l'instant $t$ :**
-
-| Variable | Définition | Table |
+| Rôle | Donnée | Table |
 | --- | --- | --- |
-| $\mathrm{Kp}_t$ | Kp de la dernière tranche de 3 h | `kp_3h` |
-| $\overline{\mathrm{Kp}}_{24h}$ | Kp moyen des 24 h passées | `kp_3h` |
-| $\mathrm{Kp}^{max}_{t-27j}$ | Kp max 27 jours avant (rotation solaire) | `kp_3h` |
-| $B_z^{min}$ | Bz le plus négatif des 6 h passées (nT) | `solar_wind_hourly` |
-| $\overline{V}$ | Vitesse moyenne du vent solaire, 6 h passées (km/s) | `solar_wind_hourly` |
-| $\overline{n}$ | Densité moyenne, 6 h passées (p/cm³) | `solar_wind_hourly` |
-| $F_{10.7}$ | Flux solaire du jour | `solar_daily` |
-| $s_t,\ c_t$ | Saison : $\sin$ et $\cos$ de $2\pi \cdot \text{jour}/365{,}25$ | calcul |
+| Cible (y) | Kp maximal des 24 h suivantes | `kp_3h` |
+| Variable | Kp actuel | `kp_3h` |
+| Variable | Bz du vent solaire | `solar_wind_hourly` |
+| Variable | Vitesse du vent solaire | `solar_wind_hourly` |
+| Variable | Densité du vent solaire | `solar_wind_hourly` |
+| Variable | Flux solaire F10.7 | `solar_daily` |
 
-Découpage dans le temps : entraînement 2010-2021, validation 2022-2023, test 2024-2026. Référence à battre : la prévision Kp de la NOAA (`kp_forecast`).
+Découpage dans le temps : entraînement 2010-2021, validation 2022-2023, test 2024-2026.
 
 ## Formule de régression
 
-**Régression logistique** (probabilité d'une belle aurore dans les 24 h) :
+```
+y = b1 + b2 × kp + b3 × bz + b4 × vitesse + b5 × densite + b6 × f107
 
-$$
-P(y_t = 1) = \sigma(z_t) = \frac{1}{1 + e^{-z_t}}
-$$
+y        = Kp maximal des 24 h suivantes   (kp_3h)
+kp       = Kp actuel                       (kp_3h)
+bz       = Bz du vent solaire              (solar_wind_hourly)
+vitesse  = vitesse du vent solaire         (solar_wind_hourly)
+densite  = densité du vent solaire         (solar_wind_hourly)
+f107     = flux solaire du jour            (solar_daily)
+```
 
-$$
-z_t = \beta_0 + \beta_1\,\mathrm{Kp}_t + \beta_2\,\overline{\mathrm{Kp}}_{24h} + \beta_3\,\mathrm{Kp}^{max}_{t-27j} + \beta_4\,B_z^{min} + \beta_5\,\overline{V} + \beta_6\,\overline{n} + \beta_7\,F_{10.7} + \beta_8\,s_t + \beta_9\,c_t
-$$
-
-Les coefficients $\beta$ sont estimés par maximum de vraisemblance. On attend $\beta_4 < 0$ : plus Bz est négatif, plus l'aurore est probable.
-
-**Visibilité par lieu** (affichage pour le directeur), pour chaque heure $h$ des 24 prochaines heures :
-
-$$
-P(\text{visible}) = P(y_t = 1) \times \mathbb{1}[\text{Soleil} < -12°] \times \left(1 - \frac{\text{nuages}_h}{100}\right) \times \left(1 - \frac{\text{brouillard}_h}{100}\right)
-$$
-
-Les nuages et le brouillard viennent de `weather_forecast` et le Soleil de `astronomy_hourly`.
-
-Couleurs (seuils provisoires) : **vert** si $P \geq 0{,}6$ (probable), **orange** si $0{,}3 \leq P < 0{,}6$ (incertain), **rouge** si $P < 0{,}3$ (pas visible).
+Belle aurore prévue si y ≥ 4. Pour chaque lieu, elle n'est visible que si le ciel est noir (`astronomy_hourly`) et dégagé (`weather_forecast`) : vert = probable, orange = incertain, rouge = pas visible.
