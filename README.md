@@ -63,7 +63,7 @@ Le code de sortie vaut 1 si au moins une source a échoué.
 
 ### Collecte automatique dans le cloud (recommandé)
 
-Le workflow `.github/workflows/collect-noaa.yml` lance la collecte **toutes les heures sur
+Le workflow `.github/workflows/collect-noaa.yml` lance la collecte **toutes les 3 heures sur
 GitHub Actions**, PC éteint. Stockage provisoire et gratuit : chaque exécution commite ses
 fichiers bruts dans la branche **`raw-data`** du dépôt (le code reste seul sur `main`).
 
@@ -71,7 +71,7 @@ Mise en route :
 
 1. Sur GitHub, dans *Settings > Secrets and variables > Actions > Variables* :
    `AURORACAST_CONTACT` = ton adresse de contact.
-2. Onglet *Actions* > « Collecte NOAA horaire » > **Run workflow** pour tester tout de suite.
+2. Onglet *Actions* > « Collecte NOAA (toutes les 3 h) » > **Run workflow** pour tester tout de suite.
 
 Chaque exécution écrit son propre manifeste dans
 `noaa/manifests/AAAA/MM/JJ/run_<horodatage>.jsonl`. Si une source échoue, l'exécution est
@@ -85,10 +85,11 @@ fichiers partiront aussi dans Azure Blob Storage (conteneur `raw`), sans autre c
 
 **Fiabilité** : l'ordonnanceur de GitHub peut retarder ou supprimer des passages (incident
 INC-003 : 2 passages en 13 h la première nuit). La collecte est donc prévue pour se rattraper :
-deux passages par heure (h17 et h47), et le vent solaire temps réel est collecté de façon
+un passage toutes les 3 heures (cadence choisie d'après la profondeur mesurée des flux :
+environ 20 h pour le vent solaire), et le vent solaire temps réel est collecté de façon
 **incrémentale** (`--state-dir`) : chaque passage lit dans les manifestes précédents l'heure
 de la dernière mesure archivée (`last_time_tag`) et reprend à partir de là, avec 10 min de
-recouvrement. Si le fichier NOAA (environ 2 jours de profondeur) ne remonte plus assez loin,
+recouvrement. Si le fichier NOAA (environ 20 h de profondeur) ne remonte plus assez loin,
 la perte est notée au manifeste (`lost_from`, `lost_to`). GitHub suspend aussi les
 planifications d'un dépôt public resté 60 jours sans activité.
 

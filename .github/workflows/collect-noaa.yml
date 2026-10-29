@@ -1,6 +1,6 @@
-name: Collecte NOAA horaire
+name: Collecte NOAA (toutes les 3 h)
 
-# Collecte automatique toutes les heures, sans PC allumé.
+# Collecte automatique toutes les 3 heures, sans PC allumé.
 # Stockage provisoire et gratuit : les fichiers bruts sont commités dans la
 # branche « raw-data » du dépôt (le code reste seul sur « main »).
 # Plus tard : ajouter le secret AZURE_STORAGE_CONNECTION_STRING et les fichiers
@@ -10,10 +10,11 @@ name: Collecte NOAA horaire
 
 on:
   schedule:
-    # Deux passages par heure, loin des heures pleines très chargées chez GitHub.
-    # L'ordonnanceur de GitHub peut retarder ou sauter des passages (incident INC-003) :
-    # la collecte incrémentale du vent solaire rattrape les passages manqués.
-    - cron: "17,47 * * * *"
+    # Un passage toutes les 3 heures (00:17, 03:17, … UTC), loin des heures pleines.
+    # Choix mesuré (INC-003) : le flux NOAA le plus court utile au modèle, le vent solaire
+    # temps réel, garde environ 20 h de mesures ; la collecte incrémentale rattrape un
+    # passage retardé ou sauté par GitHub tant que l'écart reste sous ces 20 h.
+    - cron: "17 */3 * * *"
   workflow_dispatch:       # bouton « Run workflow » pour lancer à la main
 
 permissions:
