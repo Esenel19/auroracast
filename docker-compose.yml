@@ -1,0 +1,28 @@
+# Entrepôt PostgreSQL local (développement sur le PC).
+#   Démarrer :  docker compose up -d
+#   Arrêter  :  docker compose down        (les données restent dans le volume pgdata)
+#   Tout effacer : docker compose down -v
+# Le mot de passe vient du fichier .env (POSTGRES_PASSWORD), jamais commité.
+services:
+  db:
+    image: postgres:16
+    container_name: auroracast-db
+    environment:
+      POSTGRES_DB: auroracast
+      POSTGRES_USER: auroracast
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?définir POSTGRES_PASSWORD dans le fichier .env}
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "127.0.0.1:5432:5432"   # accessible depuis ce PC seulement
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auroracast -d auroracast"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  pgdata:

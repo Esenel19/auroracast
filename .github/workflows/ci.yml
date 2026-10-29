@@ -8,6 +8,18 @@ on:
 jobs:
   tests:
     runs-on: ubuntu-latest
+    services:
+      postgres:            # vraie base PostgreSQL pour le test d'intégration de l'entrepôt
+        image: postgres:16
+        env:
+          POSTGRES_DB: auroracast_test
+          POSTGRES_USER: auroracast
+          POSTGRES_PASSWORD: test-ci-seulement
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U auroracast" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://auroracast:test-ci-seulement@localhost:5432/auroracast_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
