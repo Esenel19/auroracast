@@ -13,9 +13,16 @@ examine un fichier annuel de chacune pour vérifier qu'elle relève bien les nua
 (src/auroracast/data/stations.json), décoder la couverture nuageuse en octas et
 produire un rapport de qualité par fichier annuel.
 
+Étape 3 (commande « update », chaque jour) : re-télécharger le fichier de l'année en
+cours et n'archiver que les lignes postérieures à la dernière observation déjà archivée
+(lue dans les manifestes précédents, 6 h de recouvrement). Le fichier complet fait près
+de 1 Mo pour les 3 stations : l'archiver chaque jour ferait grossir la branche raw-data
+d'environ 340 Mo par an ; les seules lignes nouvelles pèsent quelques Ko.
+
 Utilisation :
     python -m auroracast.collect.ghcnh stations --year 2025
     python -m auroracast.collect.ghcnh backfill --start-year 2010
+    python -m auroracast.collect.ghcnh update --state-dir state
 """
 
 from __future__ import annotations
@@ -32,7 +39,7 @@ import math
 import sys
 from collections import Counter
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import requests
@@ -390,6 +397,141 @@ def backfill(
     return records
 
 
+UPDATE_OVERLAP = timedelta(hours=6)
+
+
+def _as_utc(text: str | None) -> datetime | None:
+    if not text:
+        return None
+    try:
+        value = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+
+def last_observations(state_dir: Path | None) -> dict[str, datetime]:
+    """Dernière observation archivée par fichier annuel (clé « cloud_<lieu>_<année> »),
+    d'après les manifestes des passages précédents (backfill ou mise à jour)."""
+    found: dict[str, datetime] = {}
+    if state_dir is None:
+        return found
+    for path in sorted((state_dir / "ghcnh" / "manifests").glob("**/run_*.jsonl")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not rec.get("ok") or not str(rec.get("source", "")).startswith("cloud_"):
+                continue
+            when = _as_utc(rec.get("last_obs") or (rec.get("quality") or {}).get("last_obs"))
+            if when and (rec["source"] not in found or when > found[rec["source"]]):
+                found[rec["source"]] = when
+    return found
+
+
+def new_lines(text: str, since: datetime | None) -> tuple[str, int, int, str | None]:
+    """Garde l'en-tête et les lignes dont la date (colonne DATE) est >= since.
+    Renvoie (texte gardé, lignes reçues, lignes gardées, dernière date du fichier)."""
+    lines = text.splitlines(keepends=True)
+    if not lines:
+        return "", 0, 0, None
+    header = lines[0]
+    idx = header.rstrip("\r\n").split("|").index("DATE")
+    cutoff = since.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S") if since else ""
+    kept, last = [], None
+    for line in lines[1:]:
+        date = line.split("|")[idx][:19] if line.count("|") >= idx else ""
+        if not date:
+            continue
+        last = max(last or date, date)
+        if date >= cutoff:
+            kept.append(line)
+    return header + "".join(kept), len(lines) - 1, len(kept), last
+
+
+def update(
+    out_dir: Path = DEFAULT_OUT,
+    state_dir: Path | None = None,
+    locations: tuple[Location, ...] = LOCATIONS,
+    config: dict | None = None,
+    now: Callable[[], datetime] = utc_now,
+    fetcher: Callable[..., requests.Response] = fetch,
+    session_factory: Callable[[], PoliteSession] = lambda: PoliteSession(USER_AGENT),
+) -> list[dict]:
+    """Mise à jour quotidienne : lignes nouvelles du fichier de l'année en cours (et de
+    l'année précédente pendant la première semaine de janvier)."""
+    started = now()
+    config = load_stations_config() if config is None else config
+    state = last_observations(state_dir)
+    years = [started.year - 1, started.year] if started.timetuple().tm_yday <= 7 else [started.year]
+    day_dir = out_dir / "ghcnh" / "hourly" / started.strftime("%Y/%m/%d")
+    records: list[dict] = []
+    with session_factory() as session:
+        robots = session.robots_info(STATION_LIST_URL)
+        for loc in locations:
+            chosen = config.get(loc.name)
+            if not chosen:
+                records.append({"source": f"station_{loc.name}", "technique": "api", "ok": False,
+                                "location": loc.name, "error": "station non configurée"})
+                continue
+            for year in years:
+                key = f"cloud_{loc.name}_{year}"
+                previous = state.get(key)
+                since = previous - UPDATE_OVERLAP if previous else None
+                url = year_file_url(chosen["station_id"], year)
+                rec = {"source": key, "technique": "api", "url": url, "location": loc.name,
+                       "station_id": chosen["station_id"], "collected_at": now().isoformat(),
+                       "incremental": previous is not None, "robots": robots, "ok": False,
+                       "since": since.isoformat() if since else None}
+                try:
+                    resp = fetcher(url, session, timeout=180)
+                    rec["http_status"] = resp.status_code
+                    if resp.status_code == 404:
+                        rec.update(error="pas de fichier pour cette année", missing_year=True)
+                        records.append(rec)
+                        continue
+                    resp.raise_for_status()
+                    text, received, kept, last = new_lines(
+                        resp.content.decode("utf-8", errors="replace"), since)
+                    last_obs = _as_utc(last)
+                    rec.update(ok=True, rows_received=received, rows_kept=kept, file=None,
+                               last_obs=(max(filter(None, (last_obs, previous)))).isoformat()
+                               if (last_obs or previous) else None)
+                    if kept:
+                        name = f"GHCNh_{chosen['station_id']}_{year}_maj_{stamp(started)}.psv.gz"
+                        path = day_dir / loc.name / name
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        data = text.encode("utf-8")
+                        path.write_bytes(gzip.compress(data, mtime=0))
+                        rec.update(file=path.relative_to(out_dir).as_posix(), bytes=len(data),
+                                   bytes_gz=path.stat().st_size,
+                                   sha256=hashlib.sha256(data).hexdigest())
+                except Exception as exc:  # noqa: BLE001 - consigné dans le manifeste
+                    rec["error"] = str(exc)
+                    log.error("%s %s : %s", loc.name, year, exc)
+                records.append(rec)
+    write_run_manifest(out_dir, "ghcnh", records, started)
+    return records
+
+
+def update_markdown(records: list[dict]) -> str:
+    lines = ["## Mise à jour quotidienne NOAA GHCNh", "",
+             "| Lieu | Fichier annuel | Reprise après | Lignes reçues | Lignes archivées | Dernière observation |",
+             "| --- | --- | --- | --- | --- | --- |"]
+    for r in records:
+        if not r["source"].startswith("cloud_"):
+            lines.append(f"| {r.get('location')} | — | — | — | — | {r.get('error')} |")
+            continue
+        year = r["source"].rsplit("_", 1)[-1]
+        if r["ok"]:
+            lines.append(f"| {r['location']} | {year} | {(r.get('since') or 'début')[:16]} | "
+                         f"{r['rows_received']} | {r['rows_kept']} | {(r.get('last_obs') or '—')[:16]} |")
+        else:
+            lines.append(f"| {r['location']} | {year} | — | — | — | échec : {r.get('error')} |")
+    return "\n".join(lines)
+
+
 def backfill_markdown(records: list[dict]) -> str:
     lines = ["## Backfill nébulosité NOAA GHCNh", ""]
     for sel in (r for r in records if r["source"].startswith("station_")):
@@ -420,7 +562,9 @@ def main(argv: list[str] | None = None) -> int:
     bf = sub.add_parser("backfill", help="récupérer l'historique des nuages des stations retenues")
     bf.add_argument("--start-year", type=int, default=2010)
     bf.add_argument("--end-year", type=int, default=None)
-    for p in (st, bf):
+    up = sub.add_parser("update", help="mise à jour quotidienne (lignes nouvelles de l'année en cours)")
+    up.add_argument("--state-dir", type=Path, help="dossier contenant les manifestes précédents")
+    for p in (st, bf, up):
         p.add_argument("--out", type=Path, default=DEFAULT_OUT)
         p.add_argument("--location", action="append", metavar="NOM:LAT:LON")
         p.add_argument("--summary", type=Path, help="fichier Markdown où écrire le résumé")
@@ -429,6 +573,10 @@ def main(argv: list[str] | None = None) -> int:
     locations = tuple(Location.parse(t) for t in args.location) if args.location else LOCATIONS
     if args.cmd == "stations":
         md, code = to_markdown(find_stations(args.out, args.year, locations)), 0
+    elif args.cmd == "update":
+        records = update(args.out, args.state_dir, locations)
+        md = update_markdown(records)
+        code = 1 if [r for r in records if not r["ok"] and not r.get("missing_year")] else 0
     else:
         records = backfill(args.out, args.start_year, args.end_year, locations)
         md = backfill_markdown(records)

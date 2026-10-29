@@ -17,7 +17,7 @@ from pathlib import Path
 import pandas as pd
 
 TABLES = ("kp_3h", "solar_daily", "solar_wind_hourly", "kp_forecast", "locations", "cloud_hourly",
-          "weather_daily")
+          "weather_daily", "weather_hourly")
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 

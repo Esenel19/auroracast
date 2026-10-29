@@ -13,7 +13,7 @@ import logging
 import sys
 from pathlib import Path
 
-from auroracast.transform import gsod, space_weather, weather
+from auroracast.transform import gsod, space_weather, weather, weather_hourly
 
 log = logging.getLogger("auroracast.transform")
 
@@ -22,6 +22,8 @@ def to_markdown(report: dict) -> str:
     report = dict(report)
     clouds = report.pop("cloud_hourly", None)
     daily = report.pop("weather_daily", None)
+    hourly = report.pop("weather_hourly", None)
+    cross = report.pop("crosscheck_gsod_ghcnh", None)
     lines = ["## Tables propres (météo de l'espace)", "",
              "| Table | Lignes | Début | Fin | Périodes manquantes | Sources |",
              "| --- | --- | --- | --- | --- | --- |"]
@@ -55,6 +57,24 @@ def to_markdown(report: dict) -> str:
                      f"jours min/moy/max incohérents : {daily.get('temp_incoherent_days')}.")
     elif daily and daily.get("error"):
         lines += ["", f"Météo quotidienne GSOD : {daily['error']}"]
+    if hourly and hourly.get("locations"):
+        lines += ["", "## Météo horaire observée (NOAA GHCNh)", "",
+                  ("| Lieu | Station | Début | Fin | Température | Visibilité | Heures de brouillard | "
+                   "Valeurs écartées (qualité) |"),
+                  "| --- | --- | --- | --- | --- | --- | --- | --- |"]
+        for loc, q in hourly["locations"].items():
+            ps = q["present_share"]
+            lines.append(f"| {loc} | {q['station_id']} | {q['start'][:10]} | {q['end'][:10]} | "
+                         f"{ps['temp_c']:.0%} | {ps['visibility_km']:.0%} | {q['fog_hours']} | "
+                         f"{sum(q.get('rejected_quality', {}).values())} |")
+    if cross and cross.get("locations"):
+        lines += ["", "Contrôle croisé GHCNh → GSOD (température moyenne du jour, " + cross["rule"] + ") :", "",
+                  "| Lieu | Jours comparés | Écart moyen (°C) | Jours à ±0,5 °C | Accord jours de brouillard |",
+                  "| --- | --- | --- | --- | --- |"]
+        for loc, c in cross["locations"].items():
+            fog = f"{c['fog_day_agreement']:.1%}" if c["fog_day_agreement"] is not None else "—"
+            lines.append(f"| {loc} | {c['days_compared']} | {c['temp_mean_abs_diff_c']} | "
+                         f"{c['temp_days_within_0_5c']:.1%} | {fog} |")
     return "\n".join(lines)
 
 
@@ -73,6 +93,12 @@ def main(argv: list[str] | None = None) -> int:
     daily_tables, daily_report = gsod.build(args.raw)
     tables.update(daily_tables)
     report.update(daily_report)
+    hourly_tables, hourly_report = weather_hourly.build(args.raw)
+    tables.update(hourly_tables)
+    report.update(hourly_report)
+    if "weather_daily" in tables and "weather_hourly" in tables:
+        report["crosscheck_gsod_ghcnh"] = weather_hourly.crosscheck_gsod(
+            tables["weather_hourly"], tables["weather_daily"])
     args.out.mkdir(parents=True, exist_ok=True)
     for name, df in tables.items():
         df.to_parquet(args.out / f"{name}.parquet", index=False)

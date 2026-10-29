@@ -1,0 +1,57 @@
+name: Collecte météo GHCNh (quotidienne)
+
+# Chaque jour, met à jour l'observation météo horaire des 3 stations (NOAA GHCNh :
+# nuages, température, humidité, vent, visibilité, temps présent). Le fichier de l'année
+# en cours est re-téléchargé, mais seules les lignes postérieures à la dernière
+# observation déjà archivée (6 h de recouvrement) sont gardées dans la branche raw-data :
+# quelques Ko par jour au lieu de près de 1 Mo.
+# Passe vers 05:37 UTC, avant la transformation de 06:23 UTC qui publie les tables propres.
+
+on:
+  schedule:
+    - cron: "37 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write          # nécessaire pour pousser dans la branche raw-data
+
+concurrency:
+  group: collecte-noaa     # même groupe que les autres collectes : pas de push simultané
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      AURORACAST_CONTACT: ${{ vars.AURORACAST_CONTACT }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt && pip install -e .
+
+      - name: Lire l'état des passages précédents
+        run: |
+          mkdir -p state
+          if git ls-remote --exit-code --heads origin raw-data > /dev/null; then
+            git fetch --quiet --depth 1 origin raw-data
+            git archive FETCH_HEAD ghcnh/manifests | tar -x -C state || echo "Pas encore de manifeste."
+          fi
+
+      - name: Mettre à jour (lignes nouvelles seulement)
+        id: update
+        continue-on-error: true   # on archive quand même ce qui a réussi
+        run: python -m auroracast.collect.ghcnh update --out raw --state-dir state --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Archiver dans la branche raw-data
+        if: always()
+        run: scripts/archive_to_branch.sh raw raw-data "Mise à jour GHCNh"
+
+      - name: Signaler un échec
+        if: steps.update.outcome == 'failure'
+        run: |
+          echo "::error::La mise à jour GHCNh a échoué pour au moins une station (voir le manifeste)."
+          exit 1
