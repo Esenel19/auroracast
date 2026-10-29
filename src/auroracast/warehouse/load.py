@@ -186,7 +186,10 @@ def load(clean_dir: Path, database_url: str, connect=None) -> dict:
             for table in DIMENSIONS + FACTS:
                 _copy(cur, table, frames[table])
                 log.info("%s : %d lignes", table, len(frames[table]))
-            cur.execute("SELECT pg_database_size(current_database()) / 1048576.0")
+            # taille des tables du schéma (pg_database_size compterait aussi, pendant la
+            # transaction, l'ancienne version des tables vidées : environ le double)
+            cur.execute("SELECT coalesce(sum(pg_total_relation_size(c.oid)), 0) / 1048576.0 FROM pg_class c "
+                        "WHERE c.relkind = 'r' AND c.relnamespace = 'public'::regnamespace")
             size_mb = round(float(cur.fetchone()[0]), 1)
             rows = {k: len(v) for k, v in frames.items()}
             cur.execute("INSERT INTO load_run (started_at, finished_at, rows_loaded, database_mb) "

@@ -204,3 +204,35 @@ LEFT JOIN fact_weather_observed w USING (location_id, time_utc)
 LEFT JOIN fact_kp k                                    -- tranche de 3 h, calculée sur l'époque Unix :
        ON k.time_utc = to_timestamp(floor(extract(epoch FROM a.time_utc) / 10800) * 10800);
                                                        -- indépendant du fuseau de la session
+
+-- ---------------------------------------------------------------- variables du modèle
+-- Valeurs réelles des variables de la formule de régression, recalculées à chaque requête :
+-- dernière valeur connue (avec son heure), moyenne, minimum et maximum depuis 2010.
+--   y = b1 + b2 × kp + b3 × bz + b4 × vitesse + b5 × densite + b6 × f107
+CREATE OR REPLACE VIEW v_formule_valeurs AS
+WITH kp AS (SELECT time_utc, kp FROM fact_kp WHERE time_utc >= '2010-01-01' AND kp IS NOT NULL),
+y AS (                                      -- Kp maximal des 24 h suivantes (8 tranches de 3 h)
+    SELECT time_utc, max(kp) OVER (ORDER BY time_utc ROWS BETWEEN 1 FOLLOWING AND 8 FOLLOWING) AS y,
+           count(*) OVER (ORDER BY time_utc ROWS BETWEEN 1 FOLLOWING AND 8 FOLLOWING) AS n
+    FROM kp
+),
+sw AS (SELECT * FROM fact_solar_wind WHERE time_utc >= '2010-01-01'),
+sd AS (SELECT * FROM fact_solar_daily WHERE time_utc >= '2010-01-01'),
+series(ordre, variable, definition, table_source, time_utc, valeur) AS (
+    SELECT 1, 'y', 'Kp maximal des 24 h suivantes', 'kp_3h', time_utc, y FROM y WHERE n = 8
+    UNION ALL SELECT 2, 'kp', 'Kp actuel', 'kp_3h', time_utc, kp FROM kp
+    UNION ALL SELECT 3, 'bz', 'Bz du vent solaire (nT)', 'solar_wind_hourly', time_utc, bz_gsm FROM sw WHERE bz_gsm IS NOT NULL
+    UNION ALL SELECT 4, 'vitesse', 'Vitesse du vent solaire (km/s)', 'solar_wind_hourly', time_utc, speed FROM sw WHERE speed IS NOT NULL
+    UNION ALL SELECT 5, 'densite', 'Densité du vent solaire (p/cm³)', 'solar_wind_hourly', time_utc, density FROM sw WHERE density IS NOT NULL
+    UNION ALL SELECT 6, 'f107', 'Flux solaire du jour (sfu)', 'solar_daily', time_utc, f107_obs FROM sd WHERE f107_obs IS NOT NULL
+)
+SELECT variable, definition, table_source,
+       (array_agg(valeur ORDER BY time_utc DESC))[1]::numeric(8, 2) AS derniere_valeur,
+       max(time_utc)                                                 AS derniere_heure_utc,
+       avg(valeur)::numeric(8, 2)                                    AS moyenne,
+       min(valeur)::numeric(8, 2)                                    AS minimum,
+       max(valeur)::numeric(8, 2)                                    AS maximum,
+       count(*)                                                      AS nb_valeurs
+FROM series
+GROUP BY ordre, variable, definition, table_source
+ORDER BY ordre;

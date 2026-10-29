@@ -105,3 +105,7 @@ def test_load_into_postgres_and_view(clean_dir):
     assert [r[1] for r in rows] == [pytest.approx(8.667)] * 3          # Kp de la tranche de 3 h, à chaque heure
     assert rows[0][2] is True and rows[0][4] is False and rows[0][5] is False   # Kp >= 4, mais jour et 3 octas
     assert rows[1][3] is None                                   # heure sans observation
+    with psycopg.connect(url) as conn:
+        vals = {r[0]: r for r in conn.execute("SELECT * FROM v_formule_valeurs").fetchall()}
+    assert float(vals["kp"][3]) == pytest.approx(8.67) and float(vals["bz"][5]) == pytest.approx(-27.5)
+    assert "y" not in vals                                      # moins de 24 h de Kp : pas de y

@@ -55,7 +55,11 @@ WHERE f.target_time < f.issued_at + interval '24 hours'
 GROUP BY 1, 2
 ORDER BY 1;
 
--- 5. Contrôle : historique des chargements de l'entrepôt.
+-- 5. Valeurs réelles des variables de la formule de régression (dernière valeur, moyenne,
+--    minimum, maximum depuis 2010) : y = b1 + b2 × kp + b3 × bz + b4 × vitesse + b5 × densite + b6 × f107
+SELECT * FROM v_formule_valeurs;
+
+-- 6. Contrôle : historique des chargements de l'entrepôt.
 SELECT run_id, started_at, finished_at - started_at AS duree, database_mb,
        rows_loaded ->> 'fact_weather_observed' AS lignes_meteo
 FROM load_run ORDER BY run_id DESC LIMIT 5;
