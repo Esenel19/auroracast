@@ -59,6 +59,8 @@ def write_state(tmp_path, expires):
 
 def test_url_truncates_coordinates_to_four_decimals():
     assert metno.forecast_url(TROMSO).endswith("?lat=69.6496&lon=18.9560")
+    rovaniemi = Location("rovaniemi", 66.5039, 25.7294)           # piège de la virgule flottante
+    assert metno.forecast_url(rovaniemi).endswith("?lat=66.5039&lon=25.7294")
 
 
 def test_collect_archives_response_and_headers(tmp_path):

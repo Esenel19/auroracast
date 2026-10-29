@@ -36,6 +36,7 @@ import logging
 import sys
 from collections.abc import Callable
 from datetime import UTC, datetime
+from decimal import ROUND_DOWN, Decimal
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 
@@ -51,9 +52,10 @@ NAMESPACE = "metno"
 
 
 def forecast_url(loc: Location) -> str:
-    """URL de la prévision ; coordonnées tronquées (pas arrondies) à 4 décimales."""
+    """URL de la prévision ; coordonnées tronquées (pas arrondies) à 4 décimales. Calcul en
+    décimal : en virgule flottante, 25.7294 * 10000 vaut 257293.999… et deviendrait 25.7293."""
     def trunc(x: float) -> str:
-        return f"{int(x * 10_000) / 10_000:.4f}"
+        return str(Decimal(str(x)).quantize(Decimal("0.0001"), rounding=ROUND_DOWN))
     return f"{BASE}?lat={trunc(loc.lat)}&lon={trunc(loc.lon)}"
 
 
