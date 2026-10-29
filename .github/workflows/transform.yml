@@ -22,6 +22,8 @@ jobs:
   transform:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}   # vide si le secret n'existe pas
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -40,3 +42,10 @@ jobs:
 
       - name: Publier dans la branche clean-data
         run: scripts/publish_to_branch.sh clean clean-data "Tables propres"
+
+      # Entrepôt PostgreSQL dans le cloud (Neon, offre gratuite). Secret NEON_DATABASE_URL :
+      # adresse de connexion du projet Neon (Settings > Secrets and variables > Actions > Secrets).
+      # Sans ce secret, l'étape est sautée.
+      - name: Charger l'entrepôt PostgreSQL (Neon)
+        if: env.NEON_DATABASE_URL != ''
+        run: DATABASE_URL="$NEON_DATABASE_URL" python -m auroracast.warehouse.load --clean clean --summary "$GITHUB_STEP_SUMMARY"
