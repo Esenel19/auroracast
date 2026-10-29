@@ -237,6 +237,34 @@ de service avec le seul rôle *Utilisateur de job BigQuery*, puis sur GitHub le 
 `GCP_SA_KEY` (contenu de la clé JSON) et la variable `GCP_PROJECT_ID`. Lancement :
 *Backfill historique*, source `gsod`. Ne jamais commiter la clé JSON.
 
+## Entrepôt de données PostgreSQL (modèle en étoile)
+
+Les tables propres sont chargées dans une base PostgreSQL (`sql/schema.sql`) :
+
+- **dimensions** : `dim_location` (3 lieux et leur station), `dim_time` (une ligne par heure
+  UTC depuis 1932, avec année, mois, saison des aurores…), `dim_source` (source, technique de
+  collecte, licence) ;
+- **faits globaux** : `fact_kp` (3 h), `fact_kp_forecast`, `fact_solar_daily`, `fact_solar_wind` ;
+- **faits par lieu** : `fact_weather_observed` (nuages et météo GHCNh fusionnés, par heure),
+  `fact_weather_daily` (GSOD), `fact_weather_forecast` (MET Norway, toutes les émissions),
+  `fact_astronomy` ;
+- **vue** `v_aurora_conditions` : par lieu et par heure, Kp de la tranche de 3 h, nuages,
+  brouillard, obscurité, et les indicateurs `kp_ge_4`, `dark_sky`, `clear_sky` ;
+- **suivi** : `load_run` (une ligne par chargement : durée, lignes, taille de la base).
+
+Chargement (`python -m auroracast.warehouse.load --clean data/clean`) : rechargement complet
+dans une seule transaction (schéma rejouable, `TRUNCATE`, puis `COPY`) ; en cas d'erreur, la
+base garde le chargement précédent. Environ 1,8 million de lignes, 213 Mo, 1 min en local.
+Requêtes d'exemple : `sql/requetes_exemples.sql`.
+
+Sur le PC (Docker Desktop démarré, fichier `.env` rempli d'après `.env.example`) :
+
+```powershell
+docker compose up -d                          # base PostgreSQL 16 locale
+python -m auroracast.warehouse.load           # lit DATABASE_URL dans .env
+docker exec -it auroracast-db psql -U auroracast -d auroracast   # console SQL
+```
+
 ## Respect des sites (robots.txt)
 
 Tous les collecteurs passent par `auroracast.collect.web.PoliteSession`, qui lit le robots.txt
