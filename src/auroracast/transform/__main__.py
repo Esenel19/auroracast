@@ -13,7 +13,7 @@ import logging
 import sys
 from pathlib import Path
 
-from auroracast.transform import forecast, gsod, space_weather, weather, weather_hourly
+from auroracast.transform import astronomy, forecast, gsod, space_weather, weather, weather_hourly
 
 log = logging.getLogger("auroracast.transform")
 
@@ -25,6 +25,7 @@ def to_markdown(report: dict) -> str:
     hourly = report.pop("weather_hourly", None)
     cross = report.pop("crosscheck_gsod_ghcnh", None)
     fc = report.pop("weather_forecast", None)
+    astro = report.pop("astronomy_hourly", None)
     lines = ["## Tables propres (météo de l'espace)", "",
              "| Table | Lignes | Début | Fin | Périodes manquantes | Sources |",
              "| --- | --- | --- | --- | --- | --- |"]
@@ -83,6 +84,14 @@ def to_markdown(report: dict) -> str:
         for loc, q in fc["locations"].items():
             lines.append(f"| {loc} | {q['forecasts']} | {q['last_issue'][:16]} | {q['latest_hourly_steps']} | "
                          f"{q['latest_until'][:16]} | {q['latest_fog_steps']} |")
+    if astro and astro.get("locations"):
+        lines += ["", f"## Table astronomique (calcul local, {astro['method']})", "",
+                  "| Lieu | Début | Fin | Heures de nuit noire (Soleil < -18°) | Jours de nuit polaire | Jours de soleil de minuit |",
+                  "| --- | --- | --- | --- | --- | --- |"]
+        for loc, q in astro["locations"].items():
+            lines.append(f"| {loc} | {q['start'][:10]} | {q['end'][:10]} | "
+                         f"{q['night_phase_share'].get('night', 0):.0%} | {q['polar_night_days']} | "
+                         f"{q['midnight_sun_days']} |")
     return "\n".join(lines)
 
 
@@ -104,6 +113,9 @@ def main(argv: list[str] | None = None) -> int:
     hourly_tables, hourly_report = weather_hourly.build(args.raw)
     tables.update(hourly_tables)
     report.update(hourly_report)
+    astro_tables, astro_report = astronomy.build()
+    tables.update(astro_tables)
+    report.update(astro_report)
     forecast_tables, forecast_report = forecast.build(args.raw)
     tables.update(forecast_tables)
     report.update(forecast_report)

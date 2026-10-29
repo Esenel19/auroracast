@@ -174,6 +174,7 @@ Toutes les données brutes de `raw-data` sont relues et les tables sont publiée
 | `cloud_hourly` | lieu × 1 h | `location`, `time`, `oktas`, `cloud_cover_pct`, `obscured`, `n_obs`, `offset_min`, `station_id`, `source` | NOAA GHCNh : observation la plus proche de l'heure pile, jamais interpolée |
 | `weather_daily` | lieu × jour | `location`, `day`, `temp_c`, `temp_max_c`, `temp_min_c`, `dewpoint_c`, `rel_humidity_pct`, `visibility_km`, `wind_mean_ms`, `wind_max_ms`, `precip_mm`, `precip_flag`, `precip_suspect`, `fog`, `rain`, `snow`, `hail`, `thunder`, … | NOAA GSOD par SQL (BigQuery), 2010 → 24/08/2025 ; unités SI ; lettre « I » = pas de relevé de pluie |
 | `weather_forecast` | lieu × émission × heure visée | `location`, `issued_at`, `collected_at`, `target_time`, `lead_hours`, `step_hours`, `cloud_cover_pct`, `cloud_low_pct`, `cloud_medium_pct`, `cloud_high_pct`, `fog_pct`, `temp_c`, `dewpoint_c`, `rel_humidity_pct`, `pressure_hpa`, `wind_speed_ms`, `wind_dir_deg`, `wind_gust_ms`, `precip_mm`, `precip_probability_pct`, `symbol_code`, `source_file` | MET Norway : toutes les prévisions collectées ; `issued_at` = mise à jour du modèle ; doublons de collecte : la plus récente l'emporte |
+| `astronomy_hourly` | lieu × 1 h | `location`, `time`, `sun_alt_deg`, `night_phase` (day, civil, nautical, astronomical, night), `moon_alt_deg`, `moon_illum_pct`, `moon_up`, `polar_night`, `midnight_sun`, `source` | Calcul local PyEphem (aucune collecte), 2010 → J+10 ; hauteurs géométriques ; vérifié contre sunrise-sunset.org (écart < 5 s) |
 | `weather_hourly` | lieu × 1 h | `location`, `time`, `temp_c`, `dewpoint_c`, `rel_humidity_pct`, `pressure_hpa`, `wind_speed_ms`, `wind_dir_deg`, `visibility_km`, `visibility_capped`, `fog`, `mist`, `present_weather`, `n_obs`, `offset_min`, `station_id`, `source` | NOAA GHCNh, 2010 → hier : par variable, observation la plus proche de l'heure pile ; codes qualité 2, 3, 6, 7 écartés ; vent 999 = calme ou variable ; visibilité METAR plafonnée à 10 km (Kiruna) |
 
 Contrôle croisé (rapport de qualité, `crosscheck_gsod_ghcnh`) : la température moyenne du
@@ -197,7 +198,10 @@ git worktree add data/clean clean-data
 
 Puis ouvrir `notebooks/01_exploration_meteo_espace.ipynb` (météo de l'espace),
 `notebooks/02_exploration_nuages.ipynb` (nébulosité) ou `notebooks/03_exploration_meteo_sol.ipynb`
-(vue d'ensemble des tables propres, météo au sol GSOD et GHCNh, contrôle croisé) dans VS Code (extensions *Python* et
+(vue d'ensemble des tables propres, météo au sol GSOD et GHCNh, contrôle croisé),
+`notebooks/04_previsions_meteo.ipynb` (prévisions MET Norway) ou
+`notebooks/05_exploration_astronomie.ipynb` (ciel noir, Lune, nuit polaire, biais des
+observations de nuit) dans VS Code (extensions *Python* et
 *Jupyter*) et cliquer sur *Run All*. Pour parcourir une table comme dans un tableur, clic
 droit sur un fichier `.parquet` de `data/clean` > *Open in Data Wrangler* (extension Microsoft
 *Data Wrangler*). Mise à jour des tables : `git -C data/clean fetch origin clean-data` puis `git -C data/clean reset --hard origin/clean-data` (pas de `pull` : la branche est republiée à chaque transformation).
