@@ -13,7 +13,7 @@ import logging
 import sys
 from pathlib import Path
 
-from auroracast.transform import gsod, space_weather, weather, weather_hourly
+from auroracast.transform import forecast, gsod, space_weather, weather, weather_hourly
 
 log = logging.getLogger("auroracast.transform")
 
@@ -24,6 +24,7 @@ def to_markdown(report: dict) -> str:
     daily = report.pop("weather_daily", None)
     hourly = report.pop("weather_hourly", None)
     cross = report.pop("crosscheck_gsod_ghcnh", None)
+    fc = report.pop("weather_forecast", None)
     lines = ["## Tables propres (météo de l'espace)", "",
              "| Table | Lignes | Début | Fin | Périodes manquantes | Sources |",
              "| --- | --- | --- | --- | --- | --- |"]
@@ -75,6 +76,13 @@ def to_markdown(report: dict) -> str:
             fog = f"{c['fog_day_agreement']:.1%}" if c["fog_day_agreement"] is not None else "—"
             lines.append(f"| {loc} | {c['days_compared']} | {c['temp_mean_abs_diff_c']} | "
                          f"{c['temp_days_within_0_5c']:.1%} | {fog} |")
+    if fc and fc.get("locations"):
+        lines += ["", "## Prévisions météo (MET Norway)", "",
+                  "| Lieu | Prévisions collectées | Dernière émission | Pas horaires | Jusqu'au | Pas avec brouillard |",
+                  "| --- | --- | --- | --- | --- | --- |"]
+        for loc, q in fc["locations"].items():
+            lines.append(f"| {loc} | {q['forecasts']} | {q['last_issue'][:16]} | {q['latest_hourly_steps']} | "
+                         f"{q['latest_until'][:16]} | {q['latest_fog_steps']} |")
     return "\n".join(lines)
 
 
@@ -96,6 +104,9 @@ def main(argv: list[str] | None = None) -> int:
     hourly_tables, hourly_report = weather_hourly.build(args.raw)
     tables.update(hourly_tables)
     report.update(hourly_report)
+    forecast_tables, forecast_report = forecast.build(args.raw)
+    tables.update(forecast_tables)
+    report.update(forecast_report)
     if "weather_daily" in tables and "weather_hourly" in tables:
         report["crosscheck_gsod_ghcnh"] = weather_hourly.crosscheck_gsod(
             tables["weather_hourly"], tables["weather_daily"])

@@ -173,6 +173,7 @@ Toutes les données brutes de `raw-data` sont relues et les tables sont publiée
 | `locations` | lieu | `location`, `lat`, `lon`, `station_id`, `station_name`, `station_distance_km` | `locations.py` + `data/stations.json` |
 | `cloud_hourly` | lieu × 1 h | `location`, `time`, `oktas`, `cloud_cover_pct`, `obscured`, `n_obs`, `offset_min`, `station_id`, `source` | NOAA GHCNh : observation la plus proche de l'heure pile, jamais interpolée |
 | `weather_daily` | lieu × jour | `location`, `day`, `temp_c`, `temp_max_c`, `temp_min_c`, `dewpoint_c`, `rel_humidity_pct`, `visibility_km`, `wind_mean_ms`, `wind_max_ms`, `precip_mm`, `precip_flag`, `precip_suspect`, `fog`, `rain`, `snow`, `hail`, `thunder`, … | NOAA GSOD par SQL (BigQuery), 2010 → 24/08/2025 ; unités SI ; lettre « I » = pas de relevé de pluie |
+| `weather_forecast` | lieu × émission × heure visée | `location`, `issued_at`, `collected_at`, `target_time`, `lead_hours`, `step_hours`, `cloud_cover_pct`, `cloud_low_pct`, `cloud_medium_pct`, `cloud_high_pct`, `fog_pct`, `temp_c`, `dewpoint_c`, `rel_humidity_pct`, `pressure_hpa`, `wind_speed_ms`, `wind_dir_deg`, `wind_gust_ms`, `precip_mm`, `precip_probability_pct`, `symbol_code`, `source_file` | MET Norway : toutes les prévisions collectées ; `issued_at` = mise à jour du modèle ; doublons de collecte : la plus récente l'emporte |
 | `weather_hourly` | lieu × 1 h | `location`, `time`, `temp_c`, `dewpoint_c`, `rel_humidity_pct`, `pressure_hpa`, `wind_speed_ms`, `wind_dir_deg`, `visibility_km`, `visibility_capped`, `fog`, `mist`, `present_weather`, `n_obs`, `offset_min`, `station_id`, `source` | NOAA GHCNh, 2010 → hier : par variable, observation la plus proche de l'heure pile ; codes qualité 2, 3, 6, 7 écartés ; vent 999 = calme ou variable ; visibilité METAR plafonnée à 10 km (Kiruna) |
 
 Contrôle croisé (rapport de qualité, `crosscheck_gsod_ghcnh`) : la température moyenne du
@@ -200,6 +201,20 @@ Puis ouvrir `notebooks/01_exploration_meteo_espace.ipynb` (météo de l'espace),
 *Jupyter*) et cliquer sur *Run All*. Pour parcourir une table comme dans un tableur, clic
 droit sur un fichier `.parquet` de `data/clean` > *Open in Data Wrangler* (extension Microsoft
 *Data Wrangler*). Mise à jour des tables : `git -C data/clean fetch origin clean-data` puis `git -C data/clean reset --hard origin/clean-data` (pas de `pull` : la branche est republiée à chaque transformation).
+
+### Prévisions météo (MET Norway)
+
+Le workflow de collecte (toutes les 3 h) interroge aussi l'API Locationforecast 2.0 de MET
+Norway (`collect/metno.py`, format *complete*) pour les 3 lieux : nébulosité totale et par
+étage, brouillard (part de la zone où la visibilité passe sous 1 km : l'API ne donne pas de
+visibilité en km), température, rosée, humidité, pression, vent, rafales, pluie. Pas horaire
+sur environ 50 h, puis pas de 6 h jusqu'à 10 jours. Règles de l'API respectées : User-Agent
+avec contact, coordonnées tronquées à 4 décimales, pas de nouvelle requête avant l'en-tête
+`Expires`, `If-Modified-Since` (réponse 304 sans contenu si rien n'a changé). Chaque réponse
+est archivée telle quelle (`metno/locationforecast/AAAA/MM/JJ/<lieu>/complete_<horodatage>.json.gz`,
+environ 6 Ko) et la table propre `weather_forecast` garde **toutes** les prévisions émises, pour
+pouvoir comparer plus tard le prévu à l'observé selon l'échéance. Visualisation :
+`notebooks/04_previsions_meteo.ipynb`.
 
 ### Collecte par requêtes SQL (Google BigQuery, NOAA GSOD)
 
@@ -234,6 +249,7 @@ les API qui comptent les requêtes), et le résultat est noté dans le manifeste
 | [OMNIWeb, NASA SPDF](https://omniweb.gsfc.nasa.gov/) | Vent solaire et IMF horaires | Citer OMNI Hourly Data, DOI 10.48322/1shr-ht18, avec la date d'accès |
 | [NOAA GHCNh](https://www.ncei.noaa.gov/products/global-historical-climatology-network-hourly) | Nébulosité observée par les stations | CC0 ; citer NOAA NCEI, GHCNh Version 1, DOI 10.25921/jp3d-3v19 |
 | NOAA GSOD sur BigQuery (`bigquery-public-data.noaa_gsod`) | Relevés météo quotidiens (2010 → 24/08/2025) | Données NOAA du domaine public, hébergées dans les jeux publics Google BigQuery |
+| [MET Norway, Locationforecast 2.0](https://api.met.no/weatherapi/locationforecast/2.0/documentation) | Prévisions locales : nuages par étage, brouillard, température, humidité, vent, pluie | CC BY 4.0 ; citer MET Norway, lien vers la licence, signaler les modifications ([conditions](https://api.met.no/doc/TermsOfService)) |
 
 Bonnes pratiques de collecte : User-Agent identifiable, nouvelles tentatives espacées,
 au plus une collecte par heure, aucune image ni graphique collecté.
