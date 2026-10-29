@@ -254,7 +254,7 @@ Les tables propres sont chargées dans une base PostgreSQL (`sql/schema.sql`) :
 
 Chargement (`python -m auroracast.warehouse.load --clean data/clean`) : rechargement complet
 dans une seule transaction (schéma rejouable, `TRUNCATE`, puis `COPY`) ; en cas d'erreur, la
-base garde le chargement précédent. Environ 1,8 million de lignes, 213 Mo, 1 min en local.
+base garde le chargement précédent. Environ 2,2 millions de lignes (1,36 million de faits et 831 000 heures dans `dim_time`), 213 Mo, 1 à 3 min.
 Requêtes d'exemple : `sql/requetes_exemples.sql`.
 
 Sur le PC (Docker Desktop démarré, fichier `.env` rempli d'après `.env.example`) :
