@@ -63,7 +63,7 @@ Le code de sortie vaut 1 si au moins une source a échoué.
 
 ### Collecte automatique dans le cloud (recommandé)
 
-Le workflow `.github/workflows/collect-noaa.yml` lance la collecte **toutes les heures sur
+Le workflow `.github/workflows/collect-noaa.yml` lance la collecte **toutes les 3 heures sur
 GitHub Actions**, PC éteint. Stockage provisoire et gratuit : chaque exécution commite ses
 fichiers bruts dans la branche **`raw-data`** du dépôt (le code reste seul sur `main`).
 
@@ -71,7 +71,7 @@ Mise en route :
 
 1. Sur GitHub, dans *Settings > Secrets and variables > Actions > Variables* :
    `AURORACAST_CONTACT` = ton adresse de contact.
-2. Onglet *Actions* > « Collecte NOAA horaire » > **Run workflow** pour tester tout de suite.
+2. Onglet *Actions* > « Collecte NOAA (toutes les 3 h) » > **Run workflow** pour tester tout de suite.
 
 Chaque exécution écrit son propre manifeste dans
 `noaa/manifests/AAAA/MM/JJ/run_<horodatage>.jsonl`. Si une source échoue, l'exécution est
@@ -85,10 +85,11 @@ fichiers partiront aussi dans Azure Blob Storage (conteneur `raw`), sans autre c
 
 **Fiabilité** : l'ordonnanceur de GitHub peut retarder ou supprimer des passages (incident
 INC-003 : 2 passages en 13 h la première nuit). La collecte est donc prévue pour se rattraper :
-deux passages par heure (h17 et h47), et le vent solaire temps réel est collecté de façon
+un passage toutes les 3 heures (cadence choisie d'après la profondeur mesurée des flux :
+environ 20 h pour le vent solaire), et le vent solaire temps réel est collecté de façon
 **incrémentale** (`--state-dir`) : chaque passage lit dans les manifestes précédents l'heure
 de la dernière mesure archivée (`last_time_tag`) et reprend à partir de là, avec 10 min de
-recouvrement. Si le fichier NOAA (environ 2 jours de profondeur) ne remonte plus assez loin,
+recouvrement. Si le fichier NOAA (environ 20 h de profondeur) ne remonte plus assez loin,
 la perte est notée au manifeste (`lost_from`, `lost_to`). GitHub suspend aussi les
 planifications d'un dépôt public resté 60 jours sans activité.
 
@@ -146,6 +147,13 @@ plus long trou entre deux observations. Décodage : la couche la plus couverte p
 `sky_cover_layer_1` à `4` (`CLR:00` dégagé … `OVC:08` couvert, `VV:09` ciel invisible compté
 8 octas), sinon la couverture totale de `sky_condition`.
 
+**Mise à jour quotidienne** (*Actions* > « Collecte météo GHCNh (quotidienne) », chaque jour
+vers 05:37 UTC) : le fichier de l'année en cours est re-téléchargé, mais seules les lignes
+postérieures à la dernière observation archivée (lue dans les manifestes, 6 h de
+recouvrement) sont gardées, dans `GHCNh_<station>_<année>_maj_<horodatage>.psv.gz`. Quelques
+Ko par jour au lieu de près de 1 Mo (environ 340 Mo par an évités dans `raw-data`). En local :
+`python -m auroracast.collect.ghcnh update --state-dir data/raw`.
+
 ## Transformation : tables propres
 
 ```powershell
@@ -164,6 +172,13 @@ Toutes les données brutes de `raw-data` sont relues et les tables sont publiée
 | `kp_forecast` | prévision | `issued_at`, `target_time`, `kp`, `lead_hours` | NOAA (valeurs « predicted », date d'émission = collecte où elles apparaissent) |
 | `locations` | lieu | `location`, `lat`, `lon`, `station_id`, `station_name`, `station_distance_km` | `locations.py` + `data/stations.json` |
 | `cloud_hourly` | lieu × 1 h | `location`, `time`, `oktas`, `cloud_cover_pct`, `obscured`, `n_obs`, `offset_min`, `station_id`, `source` | NOAA GHCNh : observation la plus proche de l'heure pile, jamais interpolée |
+| `weather_daily` | lieu × jour | `location`, `day`, `temp_c`, `temp_max_c`, `temp_min_c`, `dewpoint_c`, `rel_humidity_pct`, `visibility_km`, `wind_mean_ms`, `wind_max_ms`, `precip_mm`, `precip_flag`, `precip_suspect`, `fog`, `rain`, `snow`, `hail`, `thunder`, … | NOAA GSOD par SQL (BigQuery), 2010 → 24/08/2025 ; unités SI ; lettre « I » = pas de relevé de pluie |
+| `weather_hourly` | lieu × 1 h | `location`, `time`, `temp_c`, `dewpoint_c`, `rel_humidity_pct`, `pressure_hpa`, `wind_speed_ms`, `wind_dir_deg`, `visibility_km`, `visibility_capped`, `fog`, `mist`, `present_weather`, `n_obs`, `offset_min`, `station_id`, `source` | NOAA GHCNh, 2010 → hier : par variable, observation la plus proche de l'heure pile ; codes qualité 2, 3, 6, 7 écartés ; vent 999 = calme ou variable ; visibilité METAR plafonnée à 10 km (Kiruna) |
+
+Contrôle croisé (rapport de qualité, `crosscheck_gsod_ghcnh`) : la température moyenne du
+jour recalculée depuis `weather_hourly` est comparée à celle publiée par GSOD. Écart moyen
+de 0,03 à 0,09 °C selon le lieu, plus de 99 % des jours à ±0,5 °C, et 95 à 99,8 % d'accord
+sur les jours de brouillard : les deux sources (mêmes stations) se confirment.
 
 Règles : temps en UTC (début de période) ; codes d'absence convertis en NaN ; valeurs hors
 bornes physiques mises à NaN et comptées ; une ligne par période ; grille horaire continue
@@ -181,7 +196,7 @@ git worktree add data/clean clean-data
 
 Puis ouvrir `notebooks/01_exploration_meteo_espace.ipynb` (météo de l'espace),
 `notebooks/02_exploration_nuages.ipynb` (nébulosité) ou `notebooks/03_exploration_meteo_sol.ipynb`
-(vue d'ensemble des tables propres et météo au sol GSOD) dans VS Code (extensions *Python* et
+(vue d'ensemble des tables propres, météo au sol GSOD et GHCNh, contrôle croisé) dans VS Code (extensions *Python* et
 *Jupyter*) et cliquer sur *Run All*. Pour parcourir une table comme dans un tableur, clic
 droit sur un fichier `.parquet` de `data/clean` > *Open in Data Wrangler* (extension Microsoft
 *Data Wrangler*). Mise à jour des tables : `git -C data/clean fetch origin clean-data` puis `git -C data/clean reset --hard origin/clean-data` (pas de `pull` : la branche est republiée à chaque transformation).
@@ -190,11 +205,12 @@ droit sur un fichier `.parquet` de `data/clean` > *Open in Data Wrangler* (exten
 
 Base existante interrogée en SQL : `bigquery-public-data.noaa_gsod` (relevés quotidiens :
 visibilité, brouillard, précipitations, neige, température, vent). Elle s'arrête au
-24/08/2025 et sert donc d'historique. Deux requêtes paramétrées (`collect/gsod.py`) :
+24/08/2025 et sert donc d'historique ; `weather_hourly` (GHCNh, mêmes stations) prend le
+relais jusqu'à hier et sert de contrôle croisé. Deux requêtes paramétrées (`collect/gsod.py`) :
 stations les plus proches de chaque lieu (`ST_GEOGPOINT`, `ST_DISTANCE`, `ST_DWITHIN`),
 puis relevés 2010-2025 en une requête sur la table générique `gsod*` (`_TABLE_SUFFIX`) avec
 jointure sur `stations`. Chaque requête est estimée à blanc (gratuit) puis exécutée avec un
-plafond de 5 Go facturés ; le texte SQL, les octets traités et l'identifiant du job sont
+plafond de 15 Go facturés (la plus grosse lit 8,7 Go, sur 1 To gratuit par mois) ; le texte SQL, les octets traités et l'identifiant du job sont
 archivés avec les résultats (`gsod/AAAA/MM/JJ/`).
 
 Mise en route : projet Google Cloud en mode sandbox (gratuit, sans carte bancaire), compte

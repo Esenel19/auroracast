@@ -57,12 +57,13 @@ class Source:
         return Path(self.path).suffix.lstrip(".") or "txt"
 
 
-# Cadence : deux passages par heure (h17 et h47). Les fichiers temps réel du vent
-# solaire (RTSW, plusieurs Mo, environ 2 jours de mesures) sont collectés de façon
+# Cadence : un passage toutes les 3 heures (à h17). Les fichiers temps réel du vent
+# solaire (RTSW, plusieurs Mo, environ 20 h de mesures) sont collectés de façon
 # INCRÉMENTALE : chaque passage reprend après la dernière mesure déjà archivée (lue
 # dans les manifestes précédents), avec un petit recouvrement. Un passage sauté par
 # l'ordonnanceur ne fait donc perdre aucune mesure, tant que le trou reste plus court
-# que la profondeur du fichier. Sans historique, on garde les 3 dernières heures.
+# que la profondeur du fichier (kp_1m ne garde que 6 h : non utilisé par le modèle,
+# le Kp sur 3 h venant du GFZ et de kp_observed). Sans historique, on garde les 3 dernières heures.
 SOURCES: tuple[Source, ...] = (
     Source("kp_observed", "/products/noaa-planetary-k-index.json", "api"),
     Source("kp_forecast", "/products/noaa-planetary-k-index-forecast.json", "api"),

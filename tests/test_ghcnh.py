@@ -172,3 +172,68 @@ def test_backfill_reports_location_without_station(tmp_path):
     records = ghcnh.backfill(tmp_path, 2025, 2025, (far,), {}, now=lambda: FIXED,
                              fetcher=fetcher, session_factory=OfflineSession)
     assert records[0]["ok"] is False and "aucune station" in records[0]["error"]
+
+
+# --- mise à jour quotidienne (lignes nouvelles seulement) -------------------
+
+UPDATE_PSV = (
+    "STATION|DATE|temperature\n"
+    "NOM00001026|2026-10-24T00:00:00|1.0\n"
+    "NOM00001026|2026-10-24T12:00:00|2.0\n"
+    "NOM00001026|2026-10-28T06:00:00|3.0\n"
+    "NOM00001026|2026-10-28T18:00:00|4.0\n"
+)
+CONFIG = {"tromso": {"station_id": "NOM00001026", "name": "TROMSO", "distance_km": 0.9}}
+UPDATE_NOW = datetime(2026, 10, 29, 5, 37, tzinfo=UTC)
+
+
+def write_state(tmp_path, last_obs, nested=True):
+    d = tmp_path / "state/ghcnh/manifests/2026/10/27"
+    d.mkdir(parents=True)
+    rec = ({"source": "cloud_tromso_2026", "ok": True, "quality": {"last_obs": last_obs}} if nested
+           else {"source": "cloud_tromso_2026", "ok": True, "last_obs": last_obs})
+    (d / "run_20261027T000000Z.jsonl").write_text(
+        __import__("json").dumps(rec) + "\n" + '{"source": "cloud_tromso_2026", "ok": false}\n')
+    return tmp_path / "state"
+
+
+def run_update(tmp_path, state):
+    return ghcnh.update(tmp_path / "out", state, (TROMSO,), CONFIG, now=lambda: UPDATE_NOW,
+                        fetcher=lambda url, session, timeout=30: Resp(UPDATE_PSV),
+                        session_factory=OfflineSession)
+
+
+def test_last_observations_reads_backfill_and_update_manifests(tmp_path):
+    state = write_state(tmp_path, "2026-10-24T12:00:00")          # ancien format, sans fuseau
+    assert ghcnh.last_observations(state) == {"cloud_tromso_2026": datetime(2026, 10, 24, 12, tzinfo=UTC)}
+    assert ghcnh.last_observations(None) == {}
+
+
+def test_update_keeps_only_new_lines_with_overlap(tmp_path):
+    rec = run_update(tmp_path, write_state(tmp_path, "2026-10-24T12:00:00+00:00"))[0]
+    assert rec["ok"] and rec["incremental"] and rec["since"] == "2026-10-24T06:00:00+00:00"
+    assert (rec["rows_received"], rec["rows_kept"]) == (4, 3)     # 6 h de recouvrement
+    assert rec["last_obs"] == "2026-10-28T18:00:00+00:00"
+    text = gzip.decompress((tmp_path / "out" / rec["file"]).read_bytes()).decode()
+    assert text.splitlines()[0] == "STATION|DATE|temperature" and "00:00:00|1.0" not in text
+    assert rec["file"].endswith("tromso/GHCNh_NOM00001026_2026_maj_20261029T053700Z.psv.gz")
+
+
+def test_update_without_new_lines_writes_no_file(tmp_path):
+    rec = run_update(tmp_path, write_state(tmp_path, "2026-10-29T06:00:00", nested=False))[0]
+    assert rec["ok"] and rec["rows_kept"] == 0 and rec["file"] is None
+    assert rec["last_obs"] == "2026-10-29T06:00:00+00:00"          # reprise inchangée
+
+
+def test_update_without_state_keeps_whole_file_and_markdown(tmp_path):
+    records = run_update(tmp_path, None)
+    assert records[0]["rows_kept"] == 4 and records[0]["incremental"] is False
+    assert "| tromso | 2026 | début | 4 | 4 | 2026-10-28T18:00 |" in ghcnh.update_markdown(records)
+
+
+def test_update_checks_previous_year_in_first_week_of_january(tmp_path):
+    recs = ghcnh.update(tmp_path, None, (TROMSO,), CONFIG,
+                        now=lambda: datetime(2027, 1, 3, 5, 37, tzinfo=UTC),
+                        fetcher=lambda url, session, timeout=30: Resp(UPDATE_PSV),
+                        session_factory=OfflineSession)
+    assert [r["source"] for r in recs] == ["cloud_tromso_2026", "cloud_tromso_2027"]

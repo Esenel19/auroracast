@@ -28,7 +28,8 @@ from auroracast.collect import ghcnh as ghcnh_raw
 from auroracast.locations import LOCATIONS
 from auroracast.transform.common import latest_collection
 
-FILE_RE = re.compile(r"GHCNh_(?P<station>[^_]+)_(?P<year>\d{4})\.psv(\.gz)?$")
+# Fichier annuel complet (backfill) ou mise à jour quotidienne (lignes nouvelles seulement)
+FILE_RE = re.compile(r"GHCNh_(?P<station>[^_]+)_(?P<year>\d{4})(_maj_\d{8}T\d{6}Z)?\.psv(\.gz)?$")
 
 
 def locations_table(config: dict | None = None) -> pd.DataFrame:
@@ -89,7 +90,9 @@ def cloud_hourly(raw_dir: Path) -> tuple[pd.DataFrame, dict]:
             obs.append(_observations(text))
         all_obs = pd.concat(obs, ignore_index=True)
         before = len(all_obs)
-        all_obs = all_obs.drop_duplicates("obs_time")
+        # fichiers lus du plus ancien au plus récent : en cas de doublon, la collecte la
+        # plus récente l'emporte (une mise à jour peut corriger une observation)
+        all_obs = all_obs.drop_duplicates("obs_time", keep="last")
         hourly = to_hourly(all_obs)
         grid = pd.DataFrame({"time": pd.date_range(hourly["time"].min(), hourly["time"].max(),
                                                    freq="1h")})

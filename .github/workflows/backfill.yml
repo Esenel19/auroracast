@@ -25,7 +25,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: collecte-noaa   # même groupe que la collecte horaire : pas de push simultané
+  group: collecte-noaa   # même groupe que la collecte NOAA : pas de push simultané
   cancel-in-progress: false
 
 jobs:
