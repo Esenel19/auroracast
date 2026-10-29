@@ -82,7 +82,7 @@ class PoliteSession:
             delay = None
         return {**info, "allowed": allowed, "crawl_delay": float(delay) if delay else None}
 
-    def get(self, url: str, timeout: float = 30) -> requests.Response:
+    def get(self, url: str, timeout: float = 30, headers: dict | None = None) -> requests.Response:
         robots = self.robots_info(url)
         if not robots["allowed"]:
             raise RobotsDisallowed(f"interdit par {robots['robots_url']} ({robots['status']})")
@@ -92,6 +92,8 @@ class PoliteSession:
         if waited < delay:
             self._sleep(delay - waited)
         try:
+            if headers:
+                return self.session.get(url, timeout=timeout, headers=headers)
             return self.session.get(url, timeout=timeout)
         finally:
             self._last_request[origin] = self._clock()

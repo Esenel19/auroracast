@@ -1,4 +1,4 @@
-name: Collecte NOAA (toutes les 3 h)
+name: Collecte NOAA et MET Norway (toutes les 3 h)
 
 # Collecte automatique toutes les 3 heures, sans PC allumé.
 # Stockage provisoire et gratuit : les fichiers bruts sont commités dans la
@@ -43,7 +43,8 @@ jobs:
           mkdir -p state
           if git ls-remote --exit-code --heads origin raw-data > /dev/null; then
             git fetch --quiet --depth 1 origin raw-data
-            git archive FETCH_HEAD noaa/manifests | tar -x -C state || echo "Pas encore de manifeste."
+            git archive FETCH_HEAD noaa/manifests | tar -x -C state || echo "Pas encore de manifeste NOAA."
+            git archive FETCH_HEAD metno/manifests | tar -x -C state || echo "Pas encore de manifeste MET Norway."
           fi
 
       - name: Collecter
@@ -52,6 +53,13 @@ jobs:
         env:
           AURORACAST_CONTACT: ${{ vars.AURORACAST_CONTACT }}
         run: python -m auroracast.collect.noaa --out raw --run-manifest --state-dir state
+
+      - name: Prévisions météo MET Norway (nuages, brouillard, 60 h)
+        id: metno
+        continue-on-error: true
+        env:
+          AURORACAST_CONTACT: ${{ vars.AURORACAST_CONTACT }}
+        run: python -m auroracast.collect.metno --out raw --state-dir state --summary "$GITHUB_STEP_SUMMARY"
 
       - name: Archiver dans la branche raw-data
         if: always()
@@ -64,7 +72,7 @@ jobs:
           az storage blob upload-batch --destination raw --source raw --only-show-errors
 
       - name: Signaler un échec partiel
-        if: steps.collect.outcome == 'failure'
+        if: steps.collect.outcome == 'failure' || steps.metno.outcome == 'failure'
         run: |
-          echo "::error::Au moins une source NOAA a échoué (voir le manifeste de cette exécution)."
+          echo "::error::Au moins une source NOAA ou MET Norway a échoué (voir les manifestes de cette exécution)."
           exit 1
