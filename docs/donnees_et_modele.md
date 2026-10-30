@@ -60,10 +60,6 @@ f107     = flux solaire du jour            (solar_daily) (valeur du jour)
 
 Belle aurore si y ≥ 4 pour chaque lieu selectioné, elle n'est visible que si le ciel est noir (`astronomy_hourly`) et dégagé (`weather_forecast`) : vert = probable, orange = incertain, rouge = pas visible.
 
-<<<<<<< HEAD
-=======
-Belle aurore prévue si y ≥ 4. Pour chaque lieu, elle n'est visible que si le ciel est noir (`astronomy_hourly`) et dégagé (`weather_forecast`) : vert = probable, orange = incertain, rouge = pas visible.
-
 ## Modèle entraîné (régression logistique)
 
 La table d'entraînement est la vue `v_training_kp` de l'entrepôt : une ligne par tranche de 3 h depuis 2010 (49 163 tranches). La prévision est émise à la fin de la tranche et n'utilise que des valeurs déjà connues à ce moment-là.
@@ -116,4 +112,11 @@ Page web (`web/index.html`) publiée sur GitHub Pages, mise à jour toutes les 3
 | Ciel | nuages < 40 % : dégagé ; ≥ 80 % ou brouillard ≥ 50 % : couvert ; sinon partiel | `fact_weather_forecast` |
 
 **Vert** = activité forte, ciel noir et dégagé. **Rouge** = activité faible, jour/crépuscule ou ciel couvert. **Orange** = les autres cas.
->>>>>>> 69746d05b531ff1365bc67851309e4f80437a20d
+
+## Suivi des modèles dans le temps
+
+Page `suivi.html` de l'application (lien en bas de la page des prévisions), recalculée toutes les 3 h (`python -m auroracast.model.history`) :
+
+1. **Progression rejouée depuis 2016** : au début de chaque mois, le modèle est réappris avec les seules données connues à cette date, puis noté (ROC AUC) sur le mois suivant. Constat : la note varie surtout avec le cycle solaire (années calmes ou agitées) et ne monte pas avec la quantité de données (18 859 tranches en 2016, 47 832 en 2026). Les progrès viendront de nouvelles variables ou d'un autre type de modèle, pas de plus d'historique.
+2. **Versions publiées** : une ligne par version quotidienne de la branche `models` (note sur 2024 → jour J, tranches apprises).
+3. **Prévisions réelles** : ce que la version en service a annoncé, comparé à ce qui s'est passé une fois l'horizon écoulé.

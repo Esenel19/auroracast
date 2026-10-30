@@ -300,7 +300,7 @@ function renderLegend() {
     <div><span class="dot rouge"></span><span><b>Rouge, pas visible</b> : activité faible, jour ou crépuscule, ou ciel couvert (nuages ${r.couvert_min_pct} % ou plus, ou brouillard).</span></div>`;
   const m = (DATA.modele || {})["24h"];
   const perf = m && m.roc_auc_test ? `Modèle 24 h testé sur 2024-2026 : il détecte ${Math.round(m.rappel_test * 100)} % des belles aurores ; une alerte sur ${(1 / m.precision_test).toFixed(1).replace(".", ",")} se confirme. Modèles réentraînés chaque jour avec les nouvelles données. ` : "";
-  document.getElementById("footer").innerHTML = `<div>${perf}Prévision indicative : l'aurore reste un phénomène difficile à prévoir.</div><div>Sources : ${DATA.sources.join(" · ")}.</div>`;
+  document.getElementById("footer").innerHTML = `<div>${perf}Prévision indicative : l'aurore reste un phénomène difficile à prévoir. <a href="suivi.html" style="color:var(--accent)">Suivi des modèles dans le temps →</a></div><div>Sources : ${DATA.sources.join(" · ")}.</div>`;
 }
 
 function select(code) {

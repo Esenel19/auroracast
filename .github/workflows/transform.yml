@@ -70,11 +70,12 @@ jobs:
         run: |
           # derniers modèles du jour (branche models) ; à défaut, ceux du dépôt
           if git ls-remote --exit-code --heads origin models > /dev/null; then
-            git fetch --quiet --depth 1 origin models
-            rm -rf models && mkdir models && git archive FETCH_HEAD | tar -x -C models
+            git fetch --quiet origin models:refs/remotes/origin/models      # historique complet (petit)
+            rm -rf models && mkdir models && git archive origin/models | tar -x -C models
+            DATABASE_URL="$NEON_DATABASE_URL" python -m auroracast.model.history suivi --ref origin/models --models models --out site
           fi
           DATABASE_URL="$NEON_DATABASE_URL" python -m auroracast.app.predict --out site --models models
-          cp web/index.html site/index.html
+          cp web/index.html web/suivi.html site/
 
       - name: Préparer la publication de l'application
         if: env.NEON_DATABASE_URL != ''

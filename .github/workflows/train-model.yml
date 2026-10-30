@@ -7,7 +7,8 @@ name: Entraînement des modèles (quotidien)
 #   2. contrôle qualité : ROC AUC du test < 0,70 → rien n'est publié, l'ancien modèle reste ;
 #   3. modèle de production réappris sur toutes les données, publié dans la branche
 #      « models » (un commit par jour : historique de chaque version et de ses notes).
-# L'application lit la dernière version de cette branche à chaque mise à jour (toutes les 3 h).
+# L'application lit la dernière version de cette branche à chaque mise à jour (toutes les 3 h),
+# et la page « Suivi des modèles » trace l'historique de toutes les versions.
 
 on:
   schedule:
@@ -40,6 +41,10 @@ jobs:
         run: |
           DATABASE_URL="$NEON_DATABASE_URL" python -m auroracast.model.train --out trained
           cat trained/rapport_modele.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Rejouer la progression (réentraînement simulé chaque mois depuis 2016)
+        if: env.NEON_DATABASE_URL != ''
+        run: DATABASE_URL="$NEON_DATABASE_URL" python -m auroracast.model.history backtest --out trained
 
       - name: Publier dans la branche models
         if: env.NEON_DATABASE_URL != ''
