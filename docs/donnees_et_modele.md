@@ -60,3 +60,60 @@ f107     = flux solaire du jour            (solar_daily) (valeur du jour)
 
 Belle aurore si y ≥ 4 pour chaque lieu selectioné, elle n'est visible que si le ciel est noir (`astronomy_hourly`) et dégagé (`weather_forecast`) : vert = probable, orange = incertain, rouge = pas visible.
 
+<<<<<<< HEAD
+=======
+Belle aurore prévue si y ≥ 4. Pour chaque lieu, elle n'est visible que si le ciel est noir (`astronomy_hourly`) et dégagé (`weather_forecast`) : vert = probable, orange = incertain, rouge = pas visible.
+
+## Modèle entraîné (régression logistique)
+
+La table d'entraînement est la vue `v_training_kp` de l'entrepôt : une ligne par tranche de 3 h depuis 2010 (49 163 tranches). La prévision est émise à la fin de la tranche et n'utilise que des valeurs déjà connues à ce moment-là.
+
+Le modèle donne une **probabilité** de belle aurore (Kp ≥ 4) dans les 24 h :
+
+```
+p = 1 / (1 + e^-(b1 + b2 × kp + b3 × kp_moy_24h + ... + b13 × saison))
+```
+
+| Variable | Contenu | Table |
+| --- | --- | --- |
+| `kp`, `kp_mean_24h`, `kp_max_24h` | Kp actuel, moyenne et maximum des 24 dernières heures | `kp_3h` |
+| `kp_max_24h_27d` | Kp maximal il y a 27 jours (le Soleil tourne en 27 jours) | `kp_3h` |
+| `bz_mean_3h`, `bz_min_6h`, `bt_mean_3h` | Champ magnétique du vent solaire | `solar_wind_hourly` |
+| `speed_mean_6h`, `density_mean_6h` | Vitesse et densité du vent solaire | `solar_wind_hourly` |
+| `f107` | Flux solaire de la veille | `solar_daily` |
+| `doy_sin`, `doy_cos` | Saison (jour de l'année) | calcul |
+
+**Résultats sur le test (2024-2026, jamais vu pendant l'apprentissage) :**
+
+| Méthode | ROC AUC | Précision | Rappel | F1 |
+| --- | --- | --- | --- | --- |
+| Régression logistique | 0,81 | 0,54 | 0,78 | 0,64 |
+| Persistance (« demain = aujourd'hui ») | 0,68 | 0,57 | 0,57 | 0,57 |
+| Climatologie (fréquence du mois) | 0,54 | 0,35 | 0,62 | 0,45 |
+
+Le modèle détecte 78 % des belles aurores ; quand il donne l'alerte, il a raison une fois sur deux. Seuil d'alerte : probabilité ≥ 0,24, choisi sur la validation 2022-2023.
+
+**Trois horizons** (même formule, même vue, cible différente : `aurora_kp4_6h`, `aurora_kp4_24h`, `aurora_kp4_48h`) :
+
+| Horizon | ROC AUC test | Précision | Rappel | Seuil | Persistance (ROC AUC) |
+| --- | --- | --- | --- | --- | --- |
+| 6 h | 0,91 | 0,55 | 0,77 | 0,21 | 0,76 |
+| 24 h | 0,81 | 0,54 | 0,78 | 0,24 | 0,68 |
+| 48 h | 0,75 | 0,49 | 0,97 | 0,17 | 0,63 |
+
+Plus on prévoit loin, moins c'est précis : le modèle 48 h sert surtout à prévenir qu'une nuit agitée est possible.
+
+**Renouvellement quotidien** (workflow « Entraînement des modèles (quotidien) », dans le cloud) : chaque jour les trois modèles sont réévalués sur 2024 → aujourd'hui, contrôlés (ROC AUC ≥ 0,70, sinon l'ancien modèle reste en service), puis réappris sur toutes les données jusqu'à la veille et publiés dans la branche `models` (un commit par jour). Le détail est dans `rapport_modele.md`.
+
+## Application du directeur
+
+Page web (`web/index.html`) publiée sur GitHub Pages, mise à jour toutes les 3 h après la collecte et le chargement de l'entrepôt. Le calcul `python -m auroracast.app.predict` écrit `forecast.json` : pour chaque lieu et chaque heure des 48 prochaines heures, trois conditions. Chaque heure utilise le modèle le plus court qui la couvre : 6 h pour h+0 à h+5, 24 h jusqu'à h+23, 48 h ensuite.
+
+| Condition | Règle | Table |
+| --- | --- | --- |
+| Activité | probabilité du modèle ≥ son seuil : forte ; ≥ la moitié du seuil : possible ; sinon faible | `v_training_kp` |
+| Ciel noir | Soleil à −12° ou plus bas | `fact_astronomy` |
+| Ciel | nuages < 40 % : dégagé ; ≥ 80 % ou brouillard ≥ 50 % : couvert ; sinon partiel | `fact_weather_forecast` |
+
+**Vert** = activité forte, ciel noir et dégagé. **Rouge** = activité faible, jour/crépuscule ou ciel couvert. **Orange** = les autres cas.
+>>>>>>> 69746d05b531ff1365bc67851309e4f80437a20d

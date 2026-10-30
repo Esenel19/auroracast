@@ -8,12 +8,14 @@ name: Transformation des données
 #
 # Enchaînement : la transformation démarre dès que la collecte GHCNh du matin a RÉUSSI
 # (déclenchement workflow_run) ; la chaîne collecte -> transformation -> chargement de
-# l'entrepôt a donc des dépendances explicites. L'heure fixe de 09:23 UTC reste en secours
-# si la collecte n'a pas tourné ou a échoué.
+# l'entrepôt a donc des dépendances explicites. Elle suit aussi la collecte NOAA / MET Norway
+# (toutes les 3 h) : Kp, vent solaire et prévisions météo de l'application restent frais.
+# L'heure fixe de 09:23 UTC reste en secours si la collecte n'a pas tourné ou a échoué.
+# En fin de run : prévisions de l'application (forecast.json) publiées sur GitHub Pages.
 
 on:
   workflow_run:
-    workflows: ["Collecte météo GHCNh (quotidienne)"]
+    workflows: ["Collecte météo GHCNh (quotidienne)", "Collecte NOAA et MET Norway (toutes les 3 h)"]
     types: [completed]
   schedule:
     - cron: "23 9 * * *"   # secours, chaque jour vers 09:23 UTC
@@ -21,6 +23,8 @@ on:
 
 permissions:
   contents: write
+  pages: write        # publication de l'application (GitHub Pages)
+  id-token: write
 
 concurrency:
   group: transformation
@@ -59,3 +63,33 @@ jobs:
       - name: Charger l'entrepôt PostgreSQL (Neon)
         if: env.NEON_DATABASE_URL != ''
         run: DATABASE_URL="$NEON_DATABASE_URL" python -m auroracast.warehouse.load --clean clean --summary "$GITHUB_STEP_SUMMARY"
+
+      # Application du directeur : prévisions des 48 h par lieu (code couleur), page statique.
+      - name: Calculer les prévisions de l'application
+        if: env.NEON_DATABASE_URL != ''
+        run: |
+          # derniers modèles du jour (branche models) ; à défaut, ceux du dépôt
+          if git ls-remote --exit-code --heads origin models > /dev/null; then
+            git fetch --quiet --depth 1 origin models
+            rm -rf models && mkdir models && git archive FETCH_HEAD | tar -x -C models
+          fi
+          DATABASE_URL="$NEON_DATABASE_URL" python -m auroracast.app.predict --out site --models models
+          cp web/index.html site/index.html
+
+      - name: Préparer la publication de l'application
+        if: env.NEON_DATABASE_URL != ''
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  # Publication sur GitHub Pages (à activer une fois : Settings > Pages > Source : GitHub Actions)
+  application:
+    needs: transform
+    if: needs.transform.result == 'success'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

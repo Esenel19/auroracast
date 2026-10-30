@@ -241,22 +241,27 @@ ORDER BY ordre;
 -- Une ligne par tranche de 3 h (début de tranche = time_utc). La prévision est émise à la
 -- FIN de la tranche (issued_at = time_utc + 3 h) : les variables n'utilisent que des mesures
 -- antérieures à cet instant ; la cible porte sur les 24 h suivantes (8 tranches).
---   cible       kp_max_next_24h, aurora_kp4 (= Kp >= 4 au moins une fois dans les 24 h)
+--   cibles      kp_max_next_6h/24h/48h et aurora_kp4_6h/24h/48h (= Kp >= 4 au moins une fois
+--               dans les 6, 24 ou 48 h suivantes : 2, 8 ou 16 tranches)
 --   Kp          kp, kp_mean_24h, kp_max_24h, kp_max_24h_27d (rotation solaire : 27 jours avant)
 --   vent        bz_mean_3h, bz_min_6h, bt_mean_3h, speed_mean_6h, density_mean_6h
 --   Soleil      f107 (valeur de la veille ou d'avant, 4 jours au plus : mesurée à 20 h UTC)
 --   saison      doy_sin, doy_cos
-CREATE OR REPLACE VIEW v_training_kp AS
+DROP VIEW IF EXISTS v_training_kp;
+CREATE VIEW v_training_kp AS
 WITH kp AS (
     SELECT time_utc, kp,
            avg(kp) OVER w24  AS kp_mean_24h,
            max(kp) OVER w24  AS kp_max_24h,
-           max(kp) OVER nxt  AS kp_max_next_24h,
-           count(kp) OVER nxt AS n_next
+           max(kp) OVER n6    AS kp_max_next_6h,   count(kp) OVER n6  AS n6,
+           max(kp) OVER n24   AS kp_max_next_24h,  count(kp) OVER n24 AS n24,
+           max(kp) OVER n48   AS kp_max_next_48h,  count(kp) OVER n48 AS n48
     FROM fact_kp
     WHERE time_utc >= '2009-11-01'
     WINDOW w24 AS (ORDER BY time_utc ROWS BETWEEN 7 PRECEDING AND CURRENT ROW),
-           nxt AS (ORDER BY time_utc ROWS BETWEEN 1 FOLLOWING AND 8 FOLLOWING)
+           n6  AS (ORDER BY time_utc ROWS BETWEEN 1 FOLLOWING AND 2 FOLLOWING),
+           n24 AS (ORDER BY time_utc ROWS BETWEEN 1 FOLLOWING AND 8 FOLLOWING),
+           n48 AS (ORDER BY time_utc ROWS BETWEEN 1 FOLLOWING AND 16 FOLLOWING)
 ),
 sw AS (                                 -- vent solaire horaire, fenêtres glissantes
     SELECT time_utc,
@@ -270,8 +275,12 @@ sw AS (                                 -- vent solaire horaire, fenêtres gliss
 )
 SELECT k.time_utc,
        k.time_utc + INTERVAL '3 hours'                     AS issued_at,
-       CASE WHEN k.n_next = 8 THEN k.kp_max_next_24h END        AS kp_max_next_24h,
-       CASE WHEN k.n_next = 8 THEN k.kp_max_next_24h >= 4 END   AS aurora_kp4,
+       CASE WHEN k.n6  = 2  THEN k.kp_max_next_6h END          AS kp_max_next_6h,
+       CASE WHEN k.n24 = 8  THEN k.kp_max_next_24h END         AS kp_max_next_24h,
+       CASE WHEN k.n48 = 16 THEN k.kp_max_next_48h END         AS kp_max_next_48h,
+       CASE WHEN k.n6  = 2  THEN k.kp_max_next_6h  >= 4 END    AS aurora_kp4_6h,
+       CASE WHEN k.n24 = 8  THEN k.kp_max_next_24h >= 4 END    AS aurora_kp4_24h,
+       CASE WHEN k.n48 = 16 THEN k.kp_max_next_48h >= 4 END    AS aurora_kp4_48h,
        k.kp, k.kp_mean_24h, k.kp_max_24h,
        k27.kp_max_24h                                      AS kp_max_24h_27d,
        s.bz_mean_3h, s.bz_min_6h, s.bt_mean_3h, s.speed_mean_6h, s.density_mean_6h,
@@ -288,4 +297,4 @@ LEFT JOIN LATERAL (
     ORDER BY d.time_utc DESC LIMIT 1
 ) f ON true
 WHERE k.time_utc >= '2010-01-01';
--- les 8 dernières tranches (cible encore inconnue) sont gardées pour la prévision : cible NULL
+-- les dernières tranches (cible encore inconnue) sont gardées pour la prévision : cible NULL
