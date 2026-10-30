@@ -27,4 +27,10 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements-dev.txt
       - run: ruff check .
+      - name: Refuser les marques de conflit Git oubliées
+        run: |
+          if git grep -nE '^(<<<<<<< |>>>>>>> |=======$)' -- ':!*.ipynb'; then
+            echo "::error::Marques de conflit Git trouvées : résoudre le conflit avant de pousser."
+            exit 1
+          fi
       - run: pytest -q
