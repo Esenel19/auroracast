@@ -6,7 +6,9 @@ name: Entraînement des modèles (quotidien)
 #   1. évaluation sur 2024 → aujourd'hui (modèle appris sur 2010-2021) ;
 #   2. contrôle qualité : ROC AUC du test < 0,70 → rien n'est publié, l'ancien modèle reste ;
 #   3. modèle de production réappris sur toutes les données, publié dans la branche
-#      « models » (un commit par jour : historique de chaque version et de ses notes).
+#      « models » (un commit par jour : historique de chaque version et de ses notes) ;
+#   4. si MLflow est configuré (secrets MLFLOW_*) : un run par horizon dans l'expérience
+#      auroracast-kp4, modèle accepté enregistré dans le registre (alias « production »).
 # L'application lit la dernière version de cette branche à chaque mise à jour (toutes les 3 h),
 # et la page « Suivi des modèles » trace l'historique de toutes les versions.
 
@@ -28,13 +30,17 @@ jobs:
     timeout-minutes: 15
     env:
       NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      # Suivi MLflow (serveur DagsHub) : sans ces secrets, l'entraînement tourne sans MLflow.
+      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+      MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+      MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -r requirements.txt && pip install -e .
+      - run: pip install -r requirements-ml.txt && pip install -e .
 
       - name: Entraîner, évaluer et contrôler
         if: env.NEON_DATABASE_URL != ''

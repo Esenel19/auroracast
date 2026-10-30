@@ -223,12 +223,16 @@ def main(argv: list[str] | None = None) -> int:
     if not url:
         parser.error("DATABASE_URL manquant (fichier .env ou --database-url)")
 
+    from auroracast.model import tracking
+
     df = read_training(url)
+    example = df[FEATURES].dropna().tail(5)
     trained = {}
     for h in args.horizons:
         model, results = train(df, h)
         auc = results["modele"]["test"]["roc_auc"]
         if auc is None or auc < args.min_auc:
+            tracking.log_training(model, results, example, accepted=False)
             print(f"Horizon {h} h : ROC AUC du test {auc} < {args.min_auc}. Rien n'est enregistré, "
                   "l'ancien modèle reste en service.")
             return 1
@@ -245,6 +249,9 @@ def main(argv: list[str] | None = None) -> int:
         (out / f"metrics_{h}h.json").write_text(json.dumps(results, indent=2, ensure_ascii=False),
                                                 encoding="utf-8")
         reports.append(to_markdown(results, results["derniere_prevision"]))
+        version = tracking.log_training(model, results, example, accepted=True, report=reports[-1])
+        if version:
+            print(f"MLflow : {tracking.registered_name(h)} version {version} (alias production)")
     report = "\n".join(reports)
     (out / "rapport_modele.md").write_text(report, encoding="utf-8")
     print(report)

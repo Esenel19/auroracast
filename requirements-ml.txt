@@ -1,0 +1,4 @@
+# Suivi des entraînements (MLflow, compatible avec le serveur DagsHub). Installé seulement
+# par le workflow d'entraînement et en développement, pas par les collectes.
+-r requirements.txt
+mlflow>=3.1

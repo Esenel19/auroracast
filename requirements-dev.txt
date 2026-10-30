@@ -1,4 +1,4 @@
--r requirements.txt
+-r requirements-ml.txt
 pytest>=8
 ruff>=0.6
 matplotlib>=3.8
