@@ -109,3 +109,26 @@ def test_load_into_postgres_and_view(clean_dir):
         vals = {r[0]: r for r in conn.execute("SELECT * FROM v_formule_valeurs").fetchall()}
     assert float(vals["kp"][3]) == pytest.approx(8.67) and float(vals["bz"][5]) == pytest.approx(-27.5)
     assert "y" not in vals                                      # moins de 24 h de Kp : pas de y
+
+
+@pytest.mark.skipif(not os.getenv("TEST_DATABASE_URL"), reason="pas de base PostgreSQL de test (TEST_DATABASE_URL)")
+def test_training_view_has_no_leak(clean_dir):
+    """Cible = Kp max des 8 tranches SUIVANTES ; variables = passé seulement ; cible NULL en bout de série."""
+    import psycopg
+
+    times = pd.date_range(T0, periods=20, freq="3h")
+    kp = [1.0] * 20
+    kp[9] = 6.0                                                 # orage sur la 10e tranche seulement
+    pd.DataFrame({"time": times, "kp": kp, "ap": 0.0, "status": "definitive", "source": "gfz"}).to_parquet(
+        clean_dir / "kp_3h.parquet", index=False)
+    url = os.environ["TEST_DATABASE_URL"]
+    wh.load(clean_dir, url)
+    with psycopg.connect(url) as conn:
+        rows = conn.execute("SELECT kp, kp_max_24h, kp_max_next_24h, aurora_kp4 FROM v_training_kp "
+                            "ORDER BY time_utc").fetchall()
+    assert len(rows) == 20
+    assert rows[0][2] == pytest.approx(1.0) and rows[0][3] is False     # tranches 2-9 : pas d'orage
+    assert rows[1][2] == pytest.approx(6.0) and rows[1][3] is True      # tranche 10 dans les 24 h suivantes
+    assert rows[8][3] is True and rows[9][3] is False                   # l'orage de la tranche elle-même ne compte pas
+    assert rows[8][1] == pytest.approx(1.0) and rows[9][1] == pytest.approx(6.0)   # passé : orage vu après coup
+    assert all(r[2] is None for r in rows[-8:]) and rows[-9][2] is not None        # futur inconnu : cible NULL

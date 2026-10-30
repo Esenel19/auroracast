@@ -1,0 +1,42 @@
+name: Entraînement du modèle (hebdomadaire)
+
+# Réentraîne le modèle « Kp >= 4 dans les 24 h » à partir de la vue v_training_kp de
+# l'entrepôt Neon, dans le cloud : chaque lundi vers 10:13 UTC (après la transformation
+# du matin) ou à la demande. Le modèle, ses métriques et le rapport sont publiés comme
+# artefact du run (90 jours) ; le rapport s'affiche aussi dans le résumé du run.
+
+on:
+  schedule:
+    - cron: "13 10 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt && pip install -e .
+
+      - name: Entraîner et évaluer
+        if: env.NEON_DATABASE_URL != ''
+        run: |
+          DATABASE_URL="$NEON_DATABASE_URL" python -m auroracast.model.train --out models
+          cat models/rapport_modele.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publier le modèle
+        if: env.NEON_DATABASE_URL != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: modele-kp4-24h
+          path: models/
+          retention-days: 90

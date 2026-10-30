@@ -236,3 +236,56 @@ SELECT variable, definition, table_source,
 FROM series
 GROUP BY ordre, variable, definition, table_source
 ORDER BY ordre;
+
+-- ---------------------------------------------------------------- table d'entraînement
+-- Une ligne par tranche de 3 h (début de tranche = time_utc). La prévision est émise à la
+-- FIN de la tranche (issued_at = time_utc + 3 h) : les variables n'utilisent que des mesures
+-- antérieures à cet instant ; la cible porte sur les 24 h suivantes (8 tranches).
+--   cible       kp_max_next_24h, aurora_kp4 (= Kp >= 4 au moins une fois dans les 24 h)
+--   Kp          kp, kp_mean_24h, kp_max_24h, kp_max_24h_27d (rotation solaire : 27 jours avant)
+--   vent        bz_mean_3h, bz_min_6h, bt_mean_3h, speed_mean_6h, density_mean_6h
+--   Soleil      f107 (valeur de la veille ou d'avant, 4 jours au plus : mesurée à 20 h UTC)
+--   saison      doy_sin, doy_cos
+CREATE OR REPLACE VIEW v_training_kp AS
+WITH kp AS (
+    SELECT time_utc, kp,
+           avg(kp) OVER w24  AS kp_mean_24h,
+           max(kp) OVER w24  AS kp_max_24h,
+           max(kp) OVER nxt  AS kp_max_next_24h,
+           count(kp) OVER nxt AS n_next
+    FROM fact_kp
+    WHERE time_utc >= '2009-11-01'
+    WINDOW w24 AS (ORDER BY time_utc ROWS BETWEEN 7 PRECEDING AND CURRENT ROW),
+           nxt AS (ORDER BY time_utc ROWS BETWEEN 1 FOLLOWING AND 8 FOLLOWING)
+),
+sw AS (                                 -- vent solaire horaire, fenêtres glissantes
+    SELECT time_utc,
+           avg(bz_gsm)  OVER (ORDER BY time_utc RANGE BETWEEN INTERVAL '2 hours' PRECEDING AND CURRENT ROW) AS bz_mean_3h,
+           min(bz_gsm)  OVER (ORDER BY time_utc RANGE BETWEEN INTERVAL '5 hours' PRECEDING AND CURRENT ROW) AS bz_min_6h,
+           avg(bt)      OVER (ORDER BY time_utc RANGE BETWEEN INTERVAL '2 hours' PRECEDING AND CURRENT ROW) AS bt_mean_3h,
+           avg(speed)   OVER (ORDER BY time_utc RANGE BETWEEN INTERVAL '5 hours' PRECEDING AND CURRENT ROW) AS speed_mean_6h,
+           avg(density) OVER (ORDER BY time_utc RANGE BETWEEN INTERVAL '5 hours' PRECEDING AND CURRENT ROW) AS density_mean_6h
+    FROM fact_solar_wind
+    WHERE time_utc >= '2009-12-31'
+)
+SELECT k.time_utc,
+       k.time_utc + INTERVAL '3 hours'                     AS issued_at,
+       CASE WHEN k.n_next = 8 THEN k.kp_max_next_24h END        AS kp_max_next_24h,
+       CASE WHEN k.n_next = 8 THEN k.kp_max_next_24h >= 4 END   AS aurora_kp4,
+       k.kp, k.kp_mean_24h, k.kp_max_24h,
+       k27.kp_max_24h                                      AS kp_max_24h_27d,
+       s.bz_mean_3h, s.bz_min_6h, s.bt_mean_3h, s.speed_mean_6h, s.density_mean_6h,
+       f.f107_obs                                          AS f107,
+       sin(2 * pi() * extract(doy FROM k.time_utc AT TIME ZONE 'UTC') / 365.25) AS doy_sin,
+       cos(2 * pi() * extract(doy FROM k.time_utc AT TIME ZONE 'UTC') / 365.25) AS doy_cos
+FROM kp k
+LEFT JOIN kp k27 ON k27.time_utc = k.time_utc - INTERVAL '27 days'
+LEFT JOIN sw s   ON s.time_utc = k.time_utc + INTERVAL '2 hours'      -- dernière heure de la tranche
+LEFT JOIN LATERAL (
+    SELECT f107_obs FROM fact_solar_daily d
+    WHERE d.time_utc <= k.time_utc - INTERVAL '1 day' AND d.time_utc > k.time_utc - INTERVAL '5 days'
+      AND d.f107_obs IS NOT NULL
+    ORDER BY d.time_utc DESC LIMIT 1
+) f ON true
+WHERE k.time_utc >= '2010-01-01';
+-- les 8 dernières tranches (cible encore inconnue) sont gardées pour la prévision : cible NULL
