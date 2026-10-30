@@ -45,8 +45,11 @@ h1 span { color: var(--accent); }
 
 /* activité solaire */
 .activity { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px;
-  display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); gap: 16px; align-items: center; }
-.activity .big { font-size: 2.2rem; font-weight: 700; line-height: 1; font-family: var(--f-display); }
+  display: grid; gap: 14px; }
+.horizons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.hz { display: grid; gap: 4px; min-width: 0; }
+.hz .big { font-size: 2rem; font-weight: 700; line-height: 1.05; font-family: var(--f-display); }
+.solar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; border-top: 1px solid var(--line); padding-top: 12px; }
 .gauge { height: 8px; border-radius: 4px; background: var(--night); position: relative; margin-top: 10px; overflow: hidden; }
 .gauge i { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 4px; }
 .gauge b { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink); opacity: .6; }
@@ -78,9 +81,15 @@ h1 span { color: var(--accent); }
 
 /* frise 24 h */
 .timeline { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; display: grid; gap: 10px; }
-.timeline .head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
+.timeline .head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { all: unset; cursor: pointer; padding: 4px 12px; font-size: .85rem; font-weight: 600; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--surface); }
+.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.hzrow { font-size: .68rem; color: var(--muted); text-align: center; border-bottom: 2px solid var(--line); margin: 0 1px; line-height: 1.6; }
+.hzrow.h6 { border-color: var(--accent); } .hzrow.h24 { border-color: var(--muted); } .hzrow.h48 { border-color: var(--line); }
 .scroll { overflow-x: auto; }
-.grid { display: grid; grid-template-columns: 92px repeat(24, minmax(26px, 1fr)); min-width: 720px; row-gap: 4px; }
+.grid { display: grid; grid-template-columns: 92px repeat(var(--n, 24), minmax(26px, 1fr)); min-width: calc(92px + var(--n, 24) * 27px); row-gap: 4px; }
 .rowlabel { font-size: .75rem; color: var(--muted); align-self: center; padding-right: 8px; }
 .cell { all: unset; cursor: pointer; display: block; }
 .cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -110,8 +119,7 @@ footer { color: var(--muted); font-size: .78rem; border-top: 1px solid var(--lin
 .error { background: var(--rouge-soft); color: var(--ink); border-radius: 10px; padding: 16px; }
 
 @media (max-width: 700px) {
-  .activity { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .activity .main { grid-column: 1 / -1; }
+  .hz .big { font-size: 1.5rem; }
   .places, .detail { grid-template-columns: minmax(0, 1fr); }
   .place { grid-template-columns: 1fr auto; align-items: center; }
 }
@@ -127,16 +135,13 @@ footer { color: var(--muted); font-size: .78rem; border-top: 1px solid var(--lin
   </header>
 
   <section class="activity" aria-label="Activité solaire">
-    <div class="main">
-      <div class="label">Belle aurore (Kp ≥ 4) dans les 24 h</div>
-      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
-        <span class="big num" id="proba">–</span><span class="chip" id="level"></span>
-      </div>
-      <div class="gauge" aria-hidden="true"><i id="gaugeFill"></i><b id="gaugeMark"></b></div>
+    <div class="label">Belle aurore (Kp ≥ 4) : probabilité selon l'horizon</div>
+    <div class="horizons" id="horizons"></div>
+    <div class="solar">
+      <div class="stat"><div class="label">Kp actuel</div><div class="v num" id="kpNow">–</div></div>
+      <div class="stat"><div class="label">Bz (nT)</div><div class="v num" id="bz">–</div></div>
+      <div class="stat"><div class="label">Vent solaire</div><div class="v num" id="speed">–</div></div>
     </div>
-    <div class="stat"><div class="label">Kp actuel</div><div class="v num" id="kpNow">–</div></div>
-    <div class="stat"><div class="label">Bz (nT)</div><div class="v num" id="bz">–</div></div>
-    <div class="stat"><div class="label">Vent solaire</div><div class="v num" id="speed">–</div></div>
   </section>
 
   <nav class="places" id="places" aria-label="Choisir le lieu"></nav>
@@ -146,8 +151,12 @@ footer { color: var(--muted); font-size: .78rem; border-top: 1px solid var(--lin
   <section class="timeline">
     <div class="head">
       <div class="label" id="tlTitle">Prochaines 24 heures</div>
-      <div class="extra">Heure locale. Touchez une heure pour le détail.</div>
+      <div class="seg" role="group" aria-label="Durée affichée">
+        <button type="button" id="span24" aria-pressed="true">24 h</button>
+        <button type="button" id="span48" aria-pressed="false">48 h</button>
+      </div>
     </div>
+    <div class="extra">Heure locale. Touchez une heure pour le détail.</div>
     <div class="scroll"><div class="grid" id="grid"></div></div>
   </section>
 
@@ -164,7 +173,8 @@ const ZONES = { tromso: "Europe/Oslo", kiruna: "Europe/Stockholm", rovaniemi: "E
 const COLOR_TXT = { vert: "Aurore probable", orange: "Incertain", rouge: "Pas visible" };
 const SKY_TXT = { degage: "Dégagé", partiel: "Partiellement nuageux", couvert: "Couvert", inconnu: "Prévision indisponible" };
 const LEVEL_TXT = { forte: "Activité forte", possible: "Activité possible", faible: "Activité faible" };
-let DATA = null, current = null, selHour = 0;
+let DATA = null, current = null, selHour = 0, SPAN = 24;
+const hzOf = h => DATA.activite.horizons.find(a => a.horizon_h === h.horizon_h) || DATA.activite.horizons[0];
 
 const pct = v => v == null ? "–" : Math.round(v) + " %";
 const fmtHour = (iso, tz) => new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", timeZone: tz }).format(new Date(iso));
@@ -172,7 +182,7 @@ const fmtFull = (iso, tz) => new Intl.DateTimeFormat("fr-FR", { weekday: "long",
   hour: "2-digit", minute: "2-digit", timeZone: tz }).format(new Date(iso));
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 
-function reasons(h, level) {
+function reasons(h, level = h.activite) {
   const r = [];
   if (level === "faible") r.push("activité solaire trop faible");
   if (!h.ciel_noir) r.push(h.soleil_deg != null && h.soleil_deg > 0 ? "il fait jour" : "ciel pas assez noir (crépuscule)");
@@ -184,81 +194,91 @@ function reasons(h, level) {
 }
 
 function renderActivity() {
-  const a = DATA.activite, p = a.probabilite_kp4_24h * 100;
-  document.getElementById("proba").textContent = (p < 1 ? "< 1" : Math.round(p)) + " %";
-  const lv = document.getElementById("level"); lv.className = "chip " + a.niveau; lv.textContent = LEVEL_TXT[a.niveau];
-  document.getElementById("gaugeFill").style.width = Math.min(100, p) + "%";
-  document.getElementById("gaugeMark").style.left = (a.seuil_alerte * 100) + "%";
+  const a = DATA.activite, box = document.getElementById("horizons"); box.innerHTML = "";
+  a.horizons.forEach(z => {
+    const p = z.probabilite * 100, d = el("div", "hz");
+    d.innerHTML = `<div class="label">Dans les ${z.horizon_h} h</div>
+      <div class="big num">${p < 1 ? "< 1" : Math.round(p)} %</div>
+      <div><span class="chip ${z.niveau}">${LEVEL_TXT[z.niveau]}</span></div>
+      <div class="gauge" aria-hidden="true"><i style="width:${Math.min(100, p)}%"></i><b style="left:${z.seuil_alerte * 100}%"></b></div>`;
+    box.append(d);
+  });
   document.getElementById("kpNow").textContent = a.kp_actuel ?? "–";
   document.getElementById("bz").textContent = a.bz_nt == null ? "–" : (a.bz_nt > 0 ? "+" : "") + a.bz_nt;
   document.getElementById("speed").textContent = a.vitesse_kms == null ? "–" : a.vitesse_kms + " km/s";
-  const tz = "Europe/Paris";
-  document.getElementById("stamp").textContent = "Mis à jour le " + fmtFull(DATA.genere_utc, tz) + " (heure de Paris)";
+  document.getElementById("stamp").textContent = "Mis à jour le " + fmtFull(DATA.genere_utc, "Europe/Paris") + " (heure de Paris)";
 }
 
 function renderPlaces() {
   const nav = document.getElementById("places"); nav.innerHTML = "";
   DATA.lieux.forEach(l => {
-    const b = el("button", "place");
+    const r = l.resume[SPAN + "h"], b = el("button", "place");
     b.setAttribute("aria-pressed", l.code === current.code);
     b.id = "place-" + l.code;
-    const sub = l.couleur === "rouge" ? `${l.heures_noires} h de nuit noire, rien de visible`
-      : `${l.heures_vertes} h probable · ${l.heures_orange} h incertain`;
-    b.append(el("span", "name", `<span class="dot ${l.couleur}"></span>${l.nom}`), el("span", "sub", sub));
+    const sub = r.couleur === "rouge" ? `${r.heures_noires} h de nuit noire, rien de visible`
+      : `${r.heures_vertes} h probable · ${r.heures_orange} h incertain`;
+    b.append(el("span", "name", `<span class="dot ${r.couleur}"></span>${l.nom}`), el("span", "sub", sub));
     b.onclick = () => { location.hash = l.code; };
     nav.append(b);
   });
 }
 
 function renderVerdict() {
-  const l = current, tz = ZONES[l.code] || "UTC", v = document.getElementById("verdict");
-  v.className = "verdict " + l.couleur;
+  const l = current, r = l.resume[SPAN + "h"], tz = ZONES[l.code] || "UTC", v = document.getElementById("verdict");
+  v.className = "verdict " + r.couleur;
   let text;
-  if (l.couleur === "rouge") {
+  if (r.couleur === "rouge") {
     const counts = {};
-    l.heures.filter(h => h.ciel_noir).forEach(h => reasons(h, DATA.activite.niveau).forEach(r => counts[r] = (counts[r] || 0) + 1));
+    l.heures.slice(0, SPAN).filter(h => h.ciel_noir).forEach(h => reasons(h).forEach(x => counts[x] = (counts[x] || 0) + 1));
     const main = Object.entries(counts).sort((a, b) => b[1] - a[1]).map(e => e[0]);
-    text = l.heures_noires === 0 ? "Aucune heure de nuit noire dans les 24 prochaines heures."
-      : `Pendant les ${l.heures_noires} heures de nuit noire : ${main.slice(0, 2).join(" et ") || "conditions défavorables"}.`;
+    text = r.heures_noires === 0 ? `Aucune heure de nuit noire dans les ${SPAN} prochaines heures.`
+      : `Pendant les ${r.heures_noires} heures de nuit noire : ${main.slice(0, 2).join(" et ") || "conditions défavorables"}.`;
   } else {
-    const best = fmtFull(l.meilleure_heure_utc, tz);
-    text = `Meilleur moment : ${best}. ${l.heures_vertes} heure(s) probable(s), ${l.heures_orange} incertaine(s).`;
+    text = `Meilleur moment : ${fmtFull(r.meilleure_heure_utc, tz)}. ${r.heures_vertes} heure(s) probable(s), ${r.heures_orange} incertaine(s).`;
   }
-  v.innerHTML = `<div class="label">${l.nom} · prochaines 24 h</div><h2><span class="dot ${l.couleur}"></span>${COLOR_TXT[l.couleur]}</h2><p>${text}</p>`;
+  v.innerHTML = `<div class="label">${l.nom} · prochaines ${SPAN} h</div><h2><span class="dot ${r.couleur}"></span>${COLOR_TXT[r.couleur]}</h2><p>${text}</p>`;
 }
 
 function renderGrid() {
   const l = current, tz = ZONES[l.code] || "UTC", g = document.getElementById("grid"); g.innerHTML = "";
+  const H = l.heures.slice(0, SPAN); g.style.setProperty("--n", SPAN);
   const add = (cls, html) => g.append(el("div", cls, html));
   const cellBtn = (i, inner, cls) => {
     const b = el("button", "cell"); b.setAttribute("aria-label", "Détail " + fmtHour(l.heures[i].time_utc, tz) + " h");
     b.append(el("div", cls, inner)); b.onclick = () => { selHour = i; renderGrid(); renderDetail(); }; return b;
   };
-  add("rowlabel", "Heure");
-  l.heures.forEach((h, i) => add("hour" + (i === selHour ? " sel" : ""), fmtHour(h.time_utc, tz)));
+  add("rowlabel", "Modèle");
+  let start = 0;
+  H.forEach((h, i) => {
+    if (i < H.length - 1 && H[i + 1].horizon_h === h.horizon_h) return;
+    const cell = el("div", "hzrow h" + h.horizon_h, `${h.horizon_h} h`);
+    cell.style.gridColumn = `span ${i - start + 1}`; g.append(cell); start = i + 1;
+  });
+  add("rowlabel", "Heure (h)");
+  H.forEach((h, i) => add("hour" + (i === selHour ? " sel" : ""), fmtHour(h.time_utc, tz).replace(/\D/g, "")));
   add("rowlabel", "Verdict");
-  l.heures.forEach((h, i) => g.append(cellBtn(i, "", `col ${h.couleur}${i === selHour ? " sel" : ""}`)));
+  H.forEach((h, i) => g.append(cellBtn(i, "", `col ${h.couleur}${i === selHour ? " sel" : ""}`)));
   add("rowlabel", "Ciel noir");
-  l.heures.forEach(h => add("dark " + (h.ciel_noir ? "on" : "off")));
+  H.forEach(h => add("dark " + (h.ciel_noir ? "on" : "off")));
   add("rowlabel", "Nuages");
-  l.heures.forEach(h => add("bar", `<i style="height:${h.nuages_pct == null ? 0 : Math.max(2, h.nuages_pct) * 0.3}px" title="${pct(h.nuages_pct)}"></i>`));
+  H.forEach(h => add("bar", `<i style="height:${h.nuages_pct == null ? 0 : Math.max(2, h.nuages_pct) * 0.3}px" title="${pct(h.nuages_pct)}"></i>`));
   add("rowlabel", "Kp NOAA");
-  l.heures.forEach((h, i) => {
+  H.forEach((h, i) => {
     const show = i === 0 || h.kp_noaa !== l.heures[i - 1].kp_noaa;
     add("kpn" + (h.kp_noaa >= 4 ? " hi" : ""), show && h.kp_noaa != null ? h.kp_noaa.toFixed(1) : "");
   });
-  document.getElementById("tlTitle").textContent = `${l.nom} · prochaines 24 heures`;
+  document.getElementById("tlTitle").textContent = `${l.nom} · prochaines ${SPAN} heures`;
 }
 
 function renderDetail() {
-  const l = current, h = l.heures[selHour], tz = ZONES[l.code] || "UTC", a = DATA.activite;
+  const l = current, h = l.heures[selHour], tz = ZONES[l.code] || "UTC", a = hzOf(h);
   const d = document.getElementById("detail"); d.innerHTML = "";
-  const okAct = a.niveau === "forte" ? "vert" : a.niveau === "possible" ? "orange" : "rouge";
+  const okAct = h.activite === "forte" ? "vert" : h.activite === "possible" ? "orange" : "rouge";
   const okDark = h.ciel_noir ? "vert" : "rouge";
   const okSky = { degage: "vert", partiel: "orange", couvert: "rouge", inconnu: "orange" }[h.ciel];
   const phase = { day: "jour", civil: "crépuscule civil", nautical: "crépuscule nautique", astronomical: "crépuscule astronomique", night: "nuit noire" }[h.phase] || "–";
   const cards = [
-    ["Activité aurorale", okAct, LEVEL_TXT[a.niveau], `${Math.round(a.probabilite_kp4_24h * 100)} % de chances de Kp ≥ 4 (seuil d'alerte ${Math.round(a.seuil_alerte * 100)} %)` + (h.kp_noaa != null ? ` · Kp prévu par la NOAA : ${h.kp_noaa.toFixed(1)}` : "")],
+    ["Activité aurorale", okAct, LEVEL_TXT[h.activite], `Modèle ${a.horizon_h} h : ${Math.round(a.probabilite * 100)} % de chances de Kp ≥ 4 (seuil d'alerte ${Math.round(a.seuil_alerte * 100)} %)` + (h.kp_noaa != null ? ` · Kp prévu par la NOAA : ${h.kp_noaa.toFixed(1)}` : "")],
     ["Ciel noir", okDark, h.ciel_noir ? "Oui" : "Non", `Soleil à ${h.soleil_deg ?? "–"}° (${phase}) ; il faut −12° ou moins`],
     ["Météo", okSky, SKY_TXT[h.ciel], `Nuages ${pct(h.nuages_pct)} dont bas ${pct(h.nuages_bas_pct)} · brouillard ${pct(h.brouillard_pct)}`],
   ];
@@ -278,17 +298,24 @@ function renderLegend() {
     <div><span class="dot vert"></span><span><b>Vert, aurore probable</b> : activité forte, ciel noir (Soleil sous ${r.ciel_noir_soleil_deg}°) et nuages sous ${r.degage_max_pct} %.</span></div>
     <div><span class="dot orange"></span><span><b>Orange, incertain</b> : nuit noire mais activité seulement possible ou ciel en partie nuageux.</span></div>
     <div><span class="dot rouge"></span><span><b>Rouge, pas visible</b> : activité faible, jour ou crépuscule, ou ciel couvert (nuages ${r.couvert_min_pct} % ou plus, ou brouillard).</span></div>`;
-  const m = DATA.modele || {};
-  const perf = m.roc_auc_test ? `Modèle testé sur 2024-2026 : il détecte ${Math.round(m.rappel_test * 100)} % des belles aurores ; une alerte sur ${(1 / m.precision_test).toFixed(1).replace(".", ",")} se confirme. ` : "";
+  const m = (DATA.modele || {})["24h"];
+  const perf = m && m.roc_auc_test ? `Modèle 24 h testé sur 2024-2026 : il détecte ${Math.round(m.rappel_test * 100)} % des belles aurores ; une alerte sur ${(1 / m.precision_test).toFixed(1).replace(".", ",")} se confirme. Modèles réentraînés chaque jour avec les nouvelles données. ` : "";
   document.getElementById("footer").innerHTML = `<div>${perf}Prévision indicative : l'aurore reste un phénomène difficile à prévoir.</div><div>Sources : ${DATA.sources.join(" · ")}.</div>`;
 }
 
 function select(code) {
-  current = DATA.lieux.find(l => l.code === code) || DATA.lieux[0];
-  const firstDark = current.heures.findIndex(h => h.couleur !== "rouge");
-  selHour = firstDark >= 0 ? firstDark : Math.max(0, current.heures.findIndex(h => h.ciel_noir));
+  current = DATA.lieux.find(l => l.code === code) || current || DATA.lieux[0];
+  const H = current.heures.slice(0, SPAN);
+  const firstDark = H.findIndex(h => h.couleur !== "rouge");
+  selHour = firstDark >= 0 ? firstDark : Math.max(0, H.findIndex(h => h.ciel_noir));
+  document.getElementById("span24").setAttribute("aria-pressed", SPAN === 24);
+  document.getElementById("span48").setAttribute("aria-pressed", SPAN === 48);
   renderPlaces(); renderVerdict(); renderGrid(); renderDetail();
 }
+function setSpan(n) { SPAN = n; try { localStorage.setItem("auroracast-span", n); } catch (e) {} select(current && current.code); }
+document.getElementById("span24").onclick = () => setSpan(24);
+document.getElementById("span48").onclick = () => setSpan(48);
+try { if (localStorage.getItem("auroracast-span") === "48") SPAN = 48; } catch (e) {}
 
 async function start() {
   try {

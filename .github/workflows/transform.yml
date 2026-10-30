@@ -64,11 +64,16 @@ jobs:
         if: env.NEON_DATABASE_URL != ''
         run: DATABASE_URL="$NEON_DATABASE_URL" python -m auroracast.warehouse.load --clean clean --summary "$GITHUB_STEP_SUMMARY"
 
-      # Application du directeur : prévisions des 24 h par lieu (code couleur), page statique.
+      # Application du directeur : prévisions des 48 h par lieu (code couleur), page statique.
       - name: Calculer les prévisions de l'application
         if: env.NEON_DATABASE_URL != ''
         run: |
-          DATABASE_URL="$NEON_DATABASE_URL" python -m auroracast.app.predict --out site
+          # derniers modèles du jour (branche models) ; à défaut, ceux du dépôt
+          if git ls-remote --exit-code --heads origin models > /dev/null; then
+            git fetch --quiet --depth 1 origin models
+            rm -rf models && mkdir models && git archive FETCH_HEAD | tar -x -C models
+          fi
+          DATABASE_URL="$NEON_DATABASE_URL" python -m auroracast.app.predict --out site --models models
           cp web/index.html site/index.html
 
       - name: Préparer la publication de l'application

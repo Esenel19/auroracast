@@ -1,11 +1,13 @@
-"""Prévision des prochaines 24 h par lieu, avec le code couleur, pour l'interface web.
+"""Prévision des prochaines 48 h par lieu, avec le code couleur, pour l'interface web.
 
     python -m auroracast.app.predict --out site              # DATABASE_URL lu dans .env
     python -m auroracast.app.predict --now 2026-10-29T09:00Z  # rejouer une date passée
 
 Pour chaque lieu et chaque heure, trois conditions doivent être réunies :
 
-  activité  probabilité de Kp >= 4 dans les 24 h (modèle)   forte / possible / faible
+  activité  probabilité de Kp >= 4 (modèles 6, 24, 48 h)   forte / possible / faible
+            chaque heure prend le plus court horizon qui la couvre : h+0 à h+5 → 6 h,
+            h+6 à h+23 → 24 h, h+24 à h+47 → 48 h
   ciel noir hauteur du Soleil <= -12° (astronomy)          oui / non
   ciel      nébulosité et brouillard prévus (MET Norway)    dégagé / partiel / couvert
 
@@ -27,9 +29,9 @@ from pathlib import Path
 import joblib
 import pandas as pd
 
-from auroracast.model.train import FEATURES, MODEL_FILE
+from auroracast.model.train import FEATURES, HORIZONS, model_file
 
-HOURS = 24
+HOURS = 48
 DARK_SUN_ALT = -12.0            # fin du crépuscule nautique : le ciel est assez noir
 CLEAR_MAX, COVERED_MIN = 40.0, 80.0   # nébulosité totale (%)
 FOG_COVERED = 50.0              # brouillard (%) : ciel bouché
@@ -65,6 +67,12 @@ def color(act: str, dark: bool, sky_state: str) -> str:
 
 
 COLOR_RANK = {"rouge": 0, "orange": 1, "vert": 2}
+
+
+def horizon_for(hour_ahead: int, available) -> int:
+    """Plus court horizon disponible qui couvre l'heure (0 = l'heure en cours)."""
+    covering = [h for h in sorted(available) if hour_ahead < h]
+    return covering[0] if covering else max(available)
 
 
 # ------------------------------------------------------------------------- données
@@ -103,15 +111,18 @@ def _num(v, nd=1):
     return None if v is None or pd.isna(v) else round(float(v), nd)
 
 
-def build_forecast(inputs: dict, bundle: dict, now: datetime, metrics: dict | None = None) -> dict:
+def build_forecast(inputs: dict, bundles: dict, now: datetime, metrics: dict | None = None) -> dict:
+    """bundles : {horizon_h: {"model", "threshold"}} (au moins un horizon)."""
     latest = inputs["latest"]
     if latest.empty:
         raise ValueError("aucune tranche de Kp connue avant cette date")
     row = latest.iloc[[0]]
     x = row[FEATURES].apply(pd.to_numeric, errors="coerce").astype(float)
-    p = float(bundle["model"].predict_proba(x)[0, 1])
-    threshold = float(bundle["threshold"])
-    act = activity(p, threshold)
+    acts = {}
+    for h, b in sorted(bundles.items()):
+        p = float(b["model"].predict_proba(x)[0, 1])
+        acts[h] = {"horizon_h": h, "probabilite": round(p, 4), "seuil_alerte": float(b["threshold"]),
+                   "niveau": activity(p, float(b["threshold"]))}
 
     kp_fc = inputs["kp_fc"].copy()
     kp_fc["time_utc"] = pd.to_datetime(kp_fc["time_utc"], utc=True)
@@ -124,7 +135,8 @@ def build_forecast(inputs: dict, bundle: dict, now: datetime, metrics: dict | No
             df["time_utc"] = pd.to_datetime(df["time_utc"], utc=True)
         a, w = a.set_index("time_utc"), w.set_index("time_utc")
         rows = []
-        for h in hours:
+        for i, h in enumerate(hours):
+            act = acts[horizon_for(i, acts)]
             ar = a.loc[h] if h in a.index else None
             wr = w.loc[h] if h in w.index else None
             sun = None if ar is None else float(ar["sun_alt_deg"])
@@ -135,7 +147,8 @@ def build_forecast(inputs: dict, bundle: dict, now: datetime, metrics: dict | No
             slot = kp_fc[(kp_fc["time_utc"] <= h) & (kp_fc["time_utc"] + pd.Timedelta(hours=3) > h)]
             rows.append({
                 "time_utc": h.isoformat().replace("+00:00", "Z"),
-                "couleur": color(act, dark, s), "ciel_noir": dark, "ciel": s,
+                "couleur": color(act["niveau"], dark, s), "horizon_h": act["horizon_h"], "activite": act["niveau"],
+                "ciel_noir": dark, "ciel": s,
                 "soleil_deg": _num(sun), "phase": None if ar is None else ar["night_phase"],
                 "nuages_pct": _num(cloud, 0), "nuages_bas_pct": None if wr is None else _num(wr["cloud_low_pct"], 0),
                 "brouillard_pct": _num(fog, 0),
@@ -145,25 +158,29 @@ def build_forecast(inputs: dict, bundle: dict, now: datetime, metrics: dict | No
                 "lune_haute": ar is not None and float(ar["moon_alt_deg"]) > 0,
                 "kp_noaa": None if slot.empty else _num(slot.iloc[-1]["kp"], 2),
             })
-        best = max(rows, key=lambda r: COLOR_RANK[r["couleur"]])
-        n_dark = sum(r["ciel_noir"] for r in rows)
         issued = None if w.empty else pd.Timestamp(w["issued_at"].max()).isoformat().replace("+00:00", "Z")
+        summary = {}
+        for span in (24, 48):
+            part = rows[:span]
+            best = max(part, key=lambda r: COLOR_RANK[r["couleur"]])
+            summary[f"{span}h"] = {
+                "couleur": best["couleur"],
+                "meilleure_heure_utc": best["time_utc"] if best["couleur"] != "rouge" else None,
+                "heures_noires": sum(r["ciel_noir"] for r in part),
+                "heures_vertes": sum(r["couleur"] == "vert" for r in part),
+                "heures_orange": sum(r["couleur"] == "orange" for r in part)}
         out_locations.append({
             "code": loc.code, "nom": loc.name, "lat": round(float(loc.lat), 4), "lon": round(float(loc.lon), 4),
-            "couleur": best["couleur"],
-            "meilleure_heure_utc": best["time_utc"] if best["couleur"] != "rouge" else None,
-            "heures_noires": n_dark, "heures_vertes": sum(r["couleur"] == "vert" for r in rows),
-            "heures_orange": sum(r["couleur"] == "orange" for r in rows),
-            "meteo_emise_utc": issued, "heures": rows,
+            **summary["24h"], "resume": summary, "meteo_emise_utc": issued, "heures": rows,
         })
 
-    t = pd.Timestamp(row.index[0] if "time_utc" not in row else row["time_utc"].iloc[0])
+    t = pd.Timestamp(row["time_utc"].iloc[0])
     return {
         "genere_utc": now.isoformat().replace("+00:00", "Z"),
-        "activite": {"probabilite_kp4_24h": round(p, 4), "seuil_alerte": threshold, "niveau": act,
+        "activite": {"horizons": list(acts.values()),
                      "kp_actuel": _num(row["kp"].iloc[0], 2), "kp_max_24h": _num(row["kp_max_24h"].iloc[0], 2),
                      "bz_nt": _num(row["bz_mean_3h"].iloc[0]), "vitesse_kms": _num(row["speed_mean_6h"].iloc[0], 0),
-                     "tranche_kp_utc": pd.Timestamp(t).tz_convert("UTC").isoformat().replace("+00:00", "Z")},
+                     "tranche_kp_utc": t.tz_convert("UTC").isoformat().replace("+00:00", "Z")},
         "regles": {"ciel_noir_soleil_deg": DARK_SUN_ALT, "degage_max_pct": CLEAR_MAX,
                    "couvert_min_pct": COVERED_MIN, "brouillard_couvert_pct": FOG_COVERED},
         "modele": metrics or {},
@@ -188,21 +205,25 @@ def main(argv: list[str] | None = None) -> int:
     now = (pd.Timestamp(args.now).tz_convert("UTC") if args.now else pd.Timestamp(datetime.now(UTC))).floor("h")
     now = now.to_pydatetime()
 
-    bundle = joblib.load(Path(args.models) / MODEL_FILE)
-    metrics_file = Path(args.models) / "metrics.json"
-    metrics = None
-    if metrics_file.exists():
-        m = json.loads(metrics_file.read_text(encoding="utf-8"))
-        t = m["modele"]["test"]
-        metrics = {"entraine_utc": m.get("entraine_le"), "roc_auc_test": t["roc_auc"],
-                   "precision_test": t["precision"], "rappel_test": t["rappel"]}
-    data = build_forecast(read_inputs(url, now), bundle, now, metrics)
+    models = Path(args.models)
+    bundles = {h: joblib.load(models / model_file(h)) for h in HORIZONS if (models / model_file(h)).exists()}
+    if not bundles:
+        parser.error(f"aucun modèle dans {models}")
+    metrics = {}
+    for h in bundles:
+        f = models / f"metrics_{h}h.json"
+        if f.exists():
+            m = json.loads(f.read_text(encoding="utf-8"))
+            t = m["modele"]["test"]
+            metrics[f"{h}h"] = {"entraine_utc": m.get("entraine_le"), "roc_auc_test": t["roc_auc"],
+                                "precision_test": t["precision"], "rappel_test": t["rappel"]}
+    data = build_forecast(read_inputs(url, now), bundles, now, metrics)
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     (out / "forecast.json").write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
-    a = data["activite"]
-    print(f"Probabilité Kp >= 4 dans les 24 h : {a['probabilite_kp4_24h']:.0%} ({a['niveau']})")
+    for a in data["activite"]["horizons"]:
+        print(f"Probabilité Kp >= 4 dans les {a['horizon_h']:2} h : {a['probabilite']:.0%} ({a['niveau']})")
     for loc in data["lieux"]:
         print(f"  {loc['nom']:10} {loc['couleur']:7} heures noires {loc['heures_noires']:2}  "
               f"vertes {loc['heures_vertes']:2}  orange {loc['heures_orange']:2}")

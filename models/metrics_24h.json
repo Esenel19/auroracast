@@ -1,4 +1,5 @@
 {
+  "horizon_h": 24,
   "seuil_alerte": 0.24,
   "modele": {
     "train": {
@@ -170,6 +171,10 @@
       "2026-10-28T06:00:00+00:00"
     ]
   },
+  "production": {
+    "n": 49155,
+    "jusqu_au": "2026-10-28T06:00:00+00:00"
+  },
   "variables": [
     "kp",
     "kp_mean_24h",
@@ -184,11 +189,11 @@
     "doy_sin",
     "doy_cos"
   ],
-  "entraine_le": "2026-10-30T09:40:10.658015+00:00",
+  "entraine_le": "2026-10-30T10:08:23.717390+00:00",
   "derniere_prevision": {
     "tranche_utc": "2026-10-29T06:00:00+00:00",
     "emise_a_utc": "2026-10-29T09:00:00+00:00",
-    "probabilite_kp4_24h": 0.03833050223589728,
+    "probabilite": 0.04234414573210356,
     "alerte": false,
     "variables": {
       "kp": 0.67,

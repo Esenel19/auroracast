@@ -124,11 +124,13 @@ def test_training_view_has_no_leak(clean_dir):
     url = os.environ["TEST_DATABASE_URL"]
     wh.load(clean_dir, url)
     with psycopg.connect(url) as conn:
-        rows = conn.execute("SELECT kp, kp_max_24h, kp_max_next_24h, aurora_kp4 FROM v_training_kp "
-                            "ORDER BY time_utc").fetchall()
+        rows = conn.execute("SELECT kp, kp_max_24h, kp_max_next_24h, aurora_kp4_24h, aurora_kp4_6h, "
+                            "aurora_kp4_48h FROM v_training_kp ORDER BY time_utc").fetchall()
     assert len(rows) == 20
     assert rows[0][2] == pytest.approx(1.0) and rows[0][3] is False     # tranches 2-9 : pas d'orage
     assert rows[1][2] == pytest.approx(6.0) and rows[1][3] is True      # tranche 10 dans les 24 h suivantes
     assert rows[8][3] is True and rows[9][3] is False                   # l'orage de la tranche elle-même ne compte pas
     assert rows[8][1] == pytest.approx(1.0) and rows[9][1] == pytest.approx(6.0)   # passé : orage vu après coup
     assert all(r[2] is None for r in rows[-8:]) and rows[-9][2] is not None        # futur inconnu : cible NULL
+    assert [r[4] for r in rows[6:10]] == [False, True, True, False]               # 6 h = 2 tranches suivantes
+    assert rows[0][5] is True and all(r[5] is None for r in rows[4:])            # 48 h = 16 tranches suivantes

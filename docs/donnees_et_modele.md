@@ -102,15 +102,27 @@ p = 1 / (1 + e^-(b1 + b2 × kp + b3 × kp_moy_24h + ... + b13 × saison))
 | Persistance (« demain = aujourd'hui ») | 0,68 | 0,57 | 0,57 | 0,57 |
 | Climatologie (fréquence du mois) | 0,54 | 0,35 | 0,62 | 0,45 |
 
-Le modèle détecte 78 % des belles aurores ; quand il donne l'alerte, il a raison une fois sur deux. Seuil d'alerte : probabilité ≥ 0,24, choisi sur la validation 2022-2023. Le détail est dans `models/rapport_modele.md` ; le modèle est réentraîné chaque semaine dans le cloud (workflow « Entraînement du modèle »).
+Le modèle détecte 78 % des belles aurores ; quand il donne l'alerte, il a raison une fois sur deux. Seuil d'alerte : probabilité ≥ 0,24, choisi sur la validation 2022-2023.
+
+**Trois horizons** (même formule, même vue, cible différente : `aurora_kp4_6h`, `aurora_kp4_24h`, `aurora_kp4_48h`) :
+
+| Horizon | ROC AUC test | Précision | Rappel | Seuil | Persistance (ROC AUC) |
+| --- | --- | --- | --- | --- | --- |
+| 6 h | 0,91 | 0,55 | 0,77 | 0,21 | 0,76 |
+| 24 h | 0,81 | 0,54 | 0,78 | 0,24 | 0,68 |
+| 48 h | 0,75 | 0,49 | 0,97 | 0,17 | 0,63 |
+
+Plus on prévoit loin, moins c'est précis : le modèle 48 h sert surtout à prévenir qu'une nuit agitée est possible.
+
+**Renouvellement quotidien** (workflow « Entraînement des modèles (quotidien) », dans le cloud) : chaque jour les trois modèles sont réévalués sur 2024 → aujourd'hui, contrôlés (ROC AUC ≥ 0,70, sinon l'ancien modèle reste en service), puis réappris sur toutes les données jusqu'à la veille et publiés dans la branche `models` (un commit par jour). Le détail est dans `rapport_modele.md`.
 
 ## Application du directeur
 
-Page web (`web/index.html`) publiée sur GitHub Pages, mise à jour toutes les 3 h après la collecte et le chargement de l'entrepôt. Le calcul `python -m auroracast.app.predict` écrit `forecast.json` : pour chaque lieu et chaque heure des 24 prochaines heures, trois conditions.
+Page web (`web/index.html`) publiée sur GitHub Pages, mise à jour toutes les 3 h après la collecte et le chargement de l'entrepôt. Le calcul `python -m auroracast.app.predict` écrit `forecast.json` : pour chaque lieu et chaque heure des 48 prochaines heures, trois conditions. Chaque heure utilise le modèle le plus court qui la couvre : 6 h pour h+0 à h+5, 24 h jusqu'à h+23, 48 h ensuite.
 
 | Condition | Règle | Table |
 | --- | --- | --- |
-| Activité | probabilité du modèle ≥ 0,24 : forte ; ≥ 0,12 : possible ; sinon faible | `v_training_kp` |
+| Activité | probabilité du modèle ≥ son seuil : forte ; ≥ la moitié du seuil : possible ; sinon faible | `v_training_kp` |
 | Ciel noir | Soleil à −12° ou plus bas | `fact_astronomy` |
 | Ciel | nuages < 40 % : dégagé ; ≥ 80 % ou brouillard ≥ 50 % : couvert ; sinon partiel | `fact_weather_forecast` |
 

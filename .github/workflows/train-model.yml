@@ -1,17 +1,25 @@
-name: Entraînement du modèle (hebdomadaire)
+name: Entraînement des modèles (quotidien)
 
-# Réentraîne le modèle « Kp >= 4 dans les 24 h » à partir de la vue v_training_kp de
-# l'entrepôt Neon, dans le cloud : chaque lundi vers 10:13 UTC (après la transformation
-# du matin) ou à la demande. Le modèle, ses métriques et le rapport sont publiés comme
-# artefact du run (90 jours) ; le rapport s'affiche aussi dans le résumé du run.
+# Chaque jour vers 10:13 UTC (après la transformation du matin), réentraîne les modèles
+# « Kp >= 4 dans les 6, 24 et 48 h » à partir de la vue v_training_kp de l'entrepôt Neon,
+# qui contient toutes les données jusqu'à la veille.
+#   1. évaluation sur 2024 → aujourd'hui (modèle appris sur 2010-2021) ;
+#   2. contrôle qualité : ROC AUC du test < 0,70 → rien n'est publié, l'ancien modèle reste ;
+#   3. modèle de production réappris sur toutes les données, publié dans la branche
+#      « models » (un commit par jour : historique de chaque version et de ses notes).
+# L'application lit la dernière version de cette branche à chaque mise à jour (toutes les 3 h).
 
 on:
   schedule:
-    - cron: "13 10 * * 1"
+    - cron: "13 10 * * *"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write          # pousser dans la branche models
+
+concurrency:
+  group: entrainement
+  cancel-in-progress: false
 
 jobs:
   train:
@@ -27,16 +35,12 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt && pip install -e .
 
-      - name: Entraîner et évaluer
+      - name: Entraîner, évaluer et contrôler
         if: env.NEON_DATABASE_URL != ''
         run: |
-          DATABASE_URL="$NEON_DATABASE_URL" python -m auroracast.model.train --out models
-          cat models/rapport_modele.md >> "$GITHUB_STEP_SUMMARY"
+          DATABASE_URL="$NEON_DATABASE_URL" python -m auroracast.model.train --out trained
+          cat trained/rapport_modele.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Publier le modèle
+      - name: Publier dans la branche models
         if: env.NEON_DATABASE_URL != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: modele-kp4-24h
-          path: models/
-          retention-days: 90
+        run: scripts/archive_to_branch.sh trained models "Modèles du jour"
