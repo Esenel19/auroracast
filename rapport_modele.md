@@ -1,6 +1,6 @@
 # Modèle Kp ≥ 4 dans les 6 h
 
-Entraîné le 2026-10-30 10:15 UTC. Seuil d'alerte (choisi sur la validation) : **0.21**. Modèle en service appris sur 49167 tranches (jusqu'au 2026-10-29).
+Entraîné le 2026-10-30 10:42 UTC. Seuil d'alerte (choisi sur la validation) : **0.21**. Modèle en service appris sur 49167 tranches (jusqu'au 2026-10-29).
 
 | Période | Méthode | ROC AUC | PR AUC | Brier | Précision | Rappel | F1 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -33,7 +33,7 @@ Dernière tranche (2026-10-30 00:00 UTC) : probabilité **1%** → pas d’alert
 
 # Modèle Kp ≥ 4 dans les 24 h
 
-Entraîné le 2026-10-30 10:15 UTC. Seuil d'alerte (choisi sur la validation) : **0.24**. Modèle en service appris sur 49161 tranches (jusqu'au 2026-10-29).
+Entraîné le 2026-10-30 10:42 UTC. Seuil d'alerte (choisi sur la validation) : **0.24**. Modèle en service appris sur 49161 tranches (jusqu'au 2026-10-29).
 
 | Période | Méthode | ROC AUC | PR AUC | Brier | Précision | Rappel | F1 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -66,7 +66,7 @@ Dernière tranche (2026-10-30 00:00 UTC) : probabilité **4%** → pas d’alert
 
 # Modèle Kp ≥ 4 dans les 48 h
 
-Entraîné le 2026-10-30 10:15 UTC. Seuil d'alerte (choisi sur la validation) : **0.17**. Modèle en service appris sur 49153 tranches (jusqu'au 2026-10-28).
+Entraîné le 2026-10-30 10:42 UTC. Seuil d'alerte (choisi sur la validation) : **0.17**. Modèle en service appris sur 49153 tranches (jusqu'au 2026-10-28).
 
 | Période | Méthode | ROC AUC | PR AUC | Brier | Précision | Rappel | F1 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
