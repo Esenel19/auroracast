@@ -74,3 +74,32 @@ y = b1 + b2 × 0,67 + b3 × 2,60 + b4 × 349,74 + b5 × 2,64 + b6 × 90,80
 Lecture : ce 29/10, toutes les variables sont sous leur moyenne (Kp faible, Bz positif, vent lent et peu dense, Soleil calme) : le modèle prévoira un Kp bas, donc pas de belle aurore (y < 4).
 
 Belle aurore prévue si y ≥ 4. Pour chaque lieu, elle n'est visible que si le ciel est noir (`astronomy_hourly`) et dégagé (`weather_forecast`) : vert = probable, orange = incertain, rouge = pas visible.
+
+## Modèle entraîné (régression logistique)
+
+La table d'entraînement est la vue `v_training_kp` de l'entrepôt : une ligne par tranche de 3 h depuis 2010 (49 163 tranches). La prévision est émise à la fin de la tranche et n'utilise que des valeurs déjà connues à ce moment-là.
+
+Le modèle donne une **probabilité** de belle aurore (Kp ≥ 4) dans les 24 h :
+
+```
+p = 1 / (1 + e^-(b1 + b2 × kp + b3 × kp_moy_24h + ... + b13 × saison))
+```
+
+| Variable | Contenu | Table |
+| --- | --- | --- |
+| `kp`, `kp_mean_24h`, `kp_max_24h` | Kp actuel, moyenne et maximum des 24 dernières heures | `kp_3h` |
+| `kp_max_24h_27d` | Kp maximal il y a 27 jours (le Soleil tourne en 27 jours) | `kp_3h` |
+| `bz_mean_3h`, `bz_min_6h`, `bt_mean_3h` | Champ magnétique du vent solaire | `solar_wind_hourly` |
+| `speed_mean_6h`, `density_mean_6h` | Vitesse et densité du vent solaire | `solar_wind_hourly` |
+| `f107` | Flux solaire de la veille | `solar_daily` |
+| `doy_sin`, `doy_cos` | Saison (jour de l'année) | calcul |
+
+**Résultats sur le test (2024-2026, jamais vu pendant l'apprentissage) :**
+
+| Méthode | ROC AUC | Précision | Rappel | F1 |
+| --- | --- | --- | --- | --- |
+| Régression logistique | 0,81 | 0,54 | 0,78 | 0,64 |
+| Persistance (« demain = aujourd'hui ») | 0,68 | 0,57 | 0,57 | 0,57 |
+| Climatologie (fréquence du mois) | 0,54 | 0,35 | 0,62 | 0,45 |
+
+Le modèle détecte 78 % des belles aurores ; quand il donne l'alerte, il a raison une fois sur deux. Seuil d'alerte : probabilité ≥ 0,24, choisi sur la validation 2022-2023. Le détail est dans `models/rapport_modele.md` ; le modèle est réentraîné chaque semaine dans le cloud (workflow « Entraînement du modèle »).
