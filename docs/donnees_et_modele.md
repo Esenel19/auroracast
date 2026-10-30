@@ -103,3 +103,15 @@ p = 1 / (1 + e^-(b1 + b2 × kp + b3 × kp_moy_24h + ... + b13 × saison))
 | Climatologie (fréquence du mois) | 0,54 | 0,35 | 0,62 | 0,45 |
 
 Le modèle détecte 78 % des belles aurores ; quand il donne l'alerte, il a raison une fois sur deux. Seuil d'alerte : probabilité ≥ 0,24, choisi sur la validation 2022-2023. Le détail est dans `models/rapport_modele.md` ; le modèle est réentraîné chaque semaine dans le cloud (workflow « Entraînement du modèle »).
+
+## Application du directeur
+
+Page web (`web/index.html`) publiée sur GitHub Pages, mise à jour toutes les 3 h après la collecte et le chargement de l'entrepôt. Le calcul `python -m auroracast.app.predict` écrit `forecast.json` : pour chaque lieu et chaque heure des 24 prochaines heures, trois conditions.
+
+| Condition | Règle | Table |
+| --- | --- | --- |
+| Activité | probabilité du modèle ≥ 0,24 : forte ; ≥ 0,12 : possible ; sinon faible | `v_training_kp` |
+| Ciel noir | Soleil à −12° ou plus bas | `fact_astronomy` |
+| Ciel | nuages < 40 % : dégagé ; ≥ 80 % ou brouillard ≥ 50 % : couvert ; sinon partiel | `fact_weather_forecast` |
+
+**Vert** = activité forte, ciel noir et dégagé. **Rouge** = activité faible, jour/crépuscule ou ciel couvert. **Orange** = les autres cas.

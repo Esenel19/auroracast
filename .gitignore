@@ -27,3 +27,6 @@ mlruns/
 # Système
 .DS_Store
 Thumbs.db
+
+# Application (générée dans le cloud)
+site/
