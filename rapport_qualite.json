@@ -1,0 +1,459 @@
+{
+  "kp_3h": {
+    "rows": 277101,
+    "start": "1932-01-01T00:00:00+00:00",
+    "end": "2026-10-31T12:00:00+00:00",
+    "expected_rows": 277101,
+    "missing_periods": 0,
+    "missing_share": {
+      "kp": 0.0,
+      "ap": 0.0001
+    },
+    "by_source": {
+      "gfz": 277064,
+      "noaa": 37
+    },
+    "gfz_file": "gfz/kp_ap_ap_sn_f107/2026/10/27/kp_ap_ap_sn_f107_20261027T100206Z.txt",
+    "kp_duplicates_removed": 0,
+    "kp_out_of_bounds": {},
+    "noaa_rows_added": 37
+  },
+  "solar_daily": {
+    "rows": 34633,
+    "start": "1932-01-01T00:00:00+00:00",
+    "end": "2026-10-26T00:00:00+00:00",
+    "expected_rows": 34633,
+    "missing_periods": 0,
+    "missing_share": {
+      "Ap": 0.0,
+      "sn": 0.0,
+      "f107_obs": 0.1785,
+      "f107_adj": 0.1785
+    },
+    "by_source": {
+      "gfz": 34633
+    },
+    "out_of_bounds": {
+      "f107_obs": 3,
+      "f107_adj": 3
+    }
+  },
+  "solar_wind_hourly": {
+    "rows": 147546,
+    "start": "2010-01-01T00:00:00+00:00",
+    "end": "2026-10-31T17:00:00+00:00",
+    "expected_rows": 147546,
+    "missing_periods": 0,
+    "missing_share": {
+      "bt": 0.0088,
+      "by_gsm": 0.009,
+      "bz_gsm": 0.009,
+      "density": 0.0131,
+      "speed": 0.0088,
+      "bz_min": 0.9992,
+      "speed_max": 0.9992
+    },
+    "by_source": {
+      "omni": 146493,
+      "absent": 915,
+      "noaa_rtsw": 122,
+      "interpolated": 16
+    },
+    "omni_files": 17,
+    "omni_last_valid": "2026-10-13T00:00:00+00:00",
+    "rtsw_minutes_mag": 6081,
+    "rtsw_minutes_plasma": 4887,
+    "duplicates_removed": 0,
+    "out_of_bounds": {},
+    "interpolated_rows": 147,
+    "rtsw_rows_added": 122,
+    "longest_gaps": [
+      {
+        "start": "2026-10-13T01:00:00+00:00",
+        "end": "2026-10-26T15:00:00+00:00",
+        "hours": 327
+      },
+      {
+        "start": "2026-07-24T17:00:00+00:00",
+        "end": "2026-07-26T15:00:00+00:00",
+        "hours": 47
+      },
+      {
+        "start": "2026-08-03T03:00:00+00:00",
+        "end": "2026-08-04T20:00:00+00:00",
+        "hours": 42
+      },
+      {
+        "start": "2021-06-26T17:00:00+00:00",
+        "end": "2021-06-27T20:00:00+00:00",
+        "hours": 28
+      },
+      {
+        "start": "2026-08-05T22:00:00+00:00",
+        "end": "2026-08-06T22:00:00+00:00",
+        "hours": 25
+      }
+    ]
+  },
+  "kp_forecast": {
+    "collections_read": 26,
+    "distinct_forecasts": 70,
+    "rows": 70,
+    "first_issue": "2026-10-26T19:45:15+00:00",
+    "last_issue": "2026-10-31T00:49:04+00:00"
+  },
+  "cloud_hourly": {
+    "files": 63,
+    "locations": {
+      "kiruna": {
+        "station_id": "SWI0000ESNQ",
+        "start": "2010-01-01T00:00:00+00:00",
+        "end": "2026-10-28T13:00:00+00:00",
+        "hours": 147470,
+        "hours_with_cloud": 129577,
+        "cloud_share": 0.8787,
+        "clear_share": 0.3257,
+        "obscured_hours": 5012,
+        "share_by_year": {
+          "2010": 0.87,
+          "2011": 0.858,
+          "2012": 0.865,
+          "2013": 0.809,
+          "2014": 0.818,
+          "2015": 0.869,
+          "2016": 0.858,
+          "2017": 0.86,
+          "2018": 0.855,
+          "2019": 0.911,
+          "2020": 0.943,
+          "2021": 0.92,
+          "2022": 0.918,
+          "2023": 0.887,
+          "2024": 0.879,
+          "2025": 0.893,
+          "2026": 0.936
+        },
+        "observations": 304763,
+        "duplicate_observations": 50
+      },
+      "rovaniemi": {
+        "station_id": "FIM00002847",
+        "start": "2010-01-01T01:00:00+00:00",
+        "end": "2026-10-28T13:00:00+00:00",
+        "hours": 147469,
+        "hours_with_cloud": 121610,
+        "cloud_share": 0.8246,
+        "clear_share": 0.3253,
+        "obscured_hours": 2094,
+        "share_by_year": {
+          "2010": 0.651,
+          "2011": 0.641,
+          "2012": 0.545,
+          "2013": 0.551,
+          "2014": 0.603,
+          "2015": 0.683,
+          "2016": 0.893,
+          "2017": 0.995,
+          "2018": 0.962,
+          "2019": 0.993,
+          "2020": 0.996,
+          "2021": 0.987,
+          "2022": 0.92,
+          "2023": 0.978,
+          "2024": 0.819,
+          "2025": 0.892,
+          "2026": 0.93
+        },
+        "observations": 121634,
+        "duplicate_observations": 24
+      },
+      "tromso": {
+        "station_id": "NOM00001026",
+        "start": "2010-01-01T00:00:00+00:00",
+        "end": "2026-10-28T12:00:00+00:00",
+        "hours": 147469,
+        "hours_with_cloud": 45995,
+        "cloud_share": 0.3119,
+        "clear_share": 0.3231,
+        "obscured_hours": 1371,
+        "share_by_year": {
+          "2010": 0.316,
+          "2011": 0.301,
+          "2012": 0.312,
+          "2013": 0.316,
+          "2014": 0.329,
+          "2015": 0.332,
+          "2016": 0.329,
+          "2017": 0.33,
+          "2018": 0.329,
+          "2019": 0.33,
+          "2020": 0.322,
+          "2021": 0.287,
+          "2022": 0.19,
+          "2023": 0.322,
+          "2024": 0.328,
+          "2025": 0.326,
+          "2026": 0.301
+        },
+        "observations": 46006,
+        "duplicate_observations": 10
+      }
+    }
+  },
+  "weather_daily": {
+    "out_of_bounds": {},
+    "temp_incoherent_days": 0,
+    "precip_not_measured_days": 3531,
+    "precip_suspect_days": 25,
+    "unknown_station_rows": 0,
+    "duplicate_rows": 0,
+    "source_file": "gsod/2026/10/27/gsod_daily_2010_2025_20261027T104504Z.csv.gz",
+    "collected_at": "2026-10-27T10:45:11.419283+00:00",
+    "bigquery_job_id": "fa2ad20b-f595-4afe-acbf-c5672afe6673",
+    "rows_raw": 16832,
+    "locations": {
+      "kiruna": {
+        "station_id": "020440",
+        "station_name": "KIRUNA",
+        "start": "2010-01-01",
+        "end": "2025-08-24",
+        "days": 5715,
+        "missing_days": 24,
+        "missing_share": {
+          "temp_c": 0.0042,
+          "dewpoint_c": 0.0045,
+          "rel_humidity_pct": 0.0045,
+          "visibility_km": 0.0045,
+          "wind_mean_ms": 0.0042,
+          "precip_mm": 1.0
+        },
+        "fog_days": 569
+      },
+      "rovaniemi": {
+        "station_id": "028470",
+        "station_name": "ROVANIEMI RAUTATIEASEMA",
+        "start": "2010-01-01",
+        "end": "2025-08-24",
+        "days": 5715,
+        "missing_days": 111,
+        "missing_share": {
+          "temp_c": 0.0194,
+          "dewpoint_c": 0.0196,
+          "rel_humidity_pct": 0.0196,
+          "visibility_km": 0.0336,
+          "wind_mean_ms": 0.0357,
+          "precip_mm": 0.9956
+        },
+        "fog_days": 493
+      },
+      "tromso": {
+        "station_id": "010260",
+        "station_name": "TROMSO",
+        "start": "2010-01-01",
+        "end": "2025-08-24",
+        "days": 5715,
+        "missing_days": 178,
+        "missing_share": {
+          "temp_c": 0.0311,
+          "dewpoint_c": 0.0311,
+          "rel_humidity_pct": 0.0311,
+          "visibility_km": 0.0409,
+          "wind_mean_ms": 0.0332,
+          "precip_mm": 0.0772
+        },
+        "fog_days": 155
+      }
+    }
+  },
+  "weather_hourly": {
+    "files": 63,
+    "locations": {
+      "kiruna": {
+        "station_id": "SWI0000ESNQ",
+        "start": "2010-01-01T00:00:00+00:00",
+        "end": "2026-10-28T13:00:00+00:00",
+        "hours": 147470,
+        "hours_without_obs": 908,
+        "present_share": {
+          "temp_c": 0.9934,
+          "dewpoint_c": 0.9933,
+          "rel_humidity_pct": 0.9933,
+          "pressure_hpa": 0.7241,
+          "wind_speed_ms": 0.9931,
+          "wind_dir_deg": 0.944,
+          "visibility_km": 0.9664
+        },
+        "fog_hours": 966,
+        "visibility_capped_share": 0.1626,
+        "observations": 398014,
+        "duplicate_observations": 54,
+        "wind_dir_calm_or_variable": 41613,
+        "rejected_quality": {
+          "temp_c": 51,
+          "rel_humidity_pct": 87,
+          "dewpoint_c": 68,
+          "pressure_hpa": 8,
+          "wind_speed_ms": 1
+        },
+        "out_of_bounds": {
+          "pressure_hpa": 1
+        }
+      },
+      "rovaniemi": {
+        "station_id": "FIM00002847",
+        "start": "2010-01-01T00:00:00+00:00",
+        "end": "2026-10-28T13:00:00+00:00",
+        "hours": 147470,
+        "hours_without_obs": 7036,
+        "present_share": {
+          "temp_c": 0.9522,
+          "dewpoint_c": 0.9521,
+          "rel_humidity_pct": 0.952,
+          "pressure_hpa": 0.8744,
+          "wind_speed_ms": 0.8731,
+          "wind_dir_deg": 0.8297,
+          "visibility_km": 0.8725
+        },
+        "fog_hours": 941,
+        "visibility_capped_share": 0.0,
+        "observations": 140458,
+        "duplicate_observations": 24,
+        "wind_dir_calm_or_variable": 6391,
+        "rejected_quality": {
+          "dewpoint_c": 11,
+          "rel_humidity_pct": 14,
+          "temp_c": 7
+        },
+        "out_of_bounds": {}
+      },
+      "tromso": {
+        "station_id": "NOM00001026",
+        "start": "2010-01-01T00:00:00+00:00",
+        "end": "2026-10-28T13:00:00+00:00",
+        "hours": 147470,
+        "hours_without_obs": 750,
+        "present_share": {
+          "temp_c": 0.9948,
+          "dewpoint_c": 0.9948,
+          "rel_humidity_pct": 0.9948,
+          "pressure_hpa": 0.9948,
+          "wind_speed_ms": 0.9921,
+          "wind_dir_deg": 0.9898,
+          "visibility_km": 0.3121
+        },
+        "fog_hours": 365,
+        "visibility_capped_share": 0.0,
+        "observations": 146748,
+        "duplicate_observations": 27,
+        "wind_dir_calm_or_variable": 129,
+        "rejected_quality": {},
+        "out_of_bounds": {}
+      }
+    }
+  },
+  "astronomy_hourly": {
+    "method": "PyEphem 4.2.1",
+    "locations": {
+      "kiruna": {
+        "start": "2010-01-01T00:00:00+00:00",
+        "end": "2026-11-10T17:00:00+00:00",
+        "hours": 147786,
+        "night_phase_share": {
+          "day": 0.5301,
+          "night": 0.2167,
+          "civil": 0.1025,
+          "nautical": 0.0813,
+          "astronomical": 0.0694
+        },
+        "polar_night_days": 349,
+        "midnight_sun_days": 853
+      },
+      "rovaniemi": {
+        "start": "2010-01-01T00:00:00+00:00",
+        "end": "2026-11-10T17:00:00+00:00",
+        "hours": 147786,
+        "night_phase_share": {
+          "day": 0.5331,
+          "night": 0.2207,
+          "civil": 0.0956,
+          "nautical": 0.0834,
+          "astronomical": 0.0671
+        },
+        "polar_night_days": 0,
+        "midnight_sun_days": 508
+      },
+      "tromso": {
+        "start": "2010-01-01T00:00:00+00:00",
+        "end": "2026-11-10T17:00:00+00:00",
+        "hours": 147786,
+        "night_phase_share": {
+          "day": 0.528,
+          "night": 0.2101,
+          "civil": 0.1038,
+          "nautical": 0.0878,
+          "astronomical": 0.0703
+        },
+        "polar_night_days": 791,
+        "midnight_sun_days": 1168
+      }
+    }
+  },
+  "weather_forecast": {
+    "files": 27,
+    "unreadable_files": [],
+    "out_of_bounds": {},
+    "duplicate_rows": 0,
+    "locations": {
+      "kiruna": {
+        "forecasts": 9,
+        "first_issue": "2026-10-29T08:30:21+00:00",
+        "last_issue": "2026-10-31T16:29:27+00:00",
+        "latest_hourly_steps": 56,
+        "latest_until": "2026-11-10T06:00:00+00:00",
+        "latest_fog_steps": 57
+      },
+      "rovaniemi": {
+        "forecasts": 9,
+        "first_issue": "2026-10-29T08:30:22+00:00",
+        "last_issue": "2026-10-31T16:29:17+00:00",
+        "latest_hourly_steps": 55,
+        "latest_until": "2026-11-10T06:00:00+00:00",
+        "latest_fog_steps": 56
+      },
+      "tromso": {
+        "forecasts": 9,
+        "first_issue": "2026-10-29T08:30:21+00:00",
+        "last_issue": "2026-10-31T16:29:25+00:00",
+        "latest_hourly_steps": 56,
+        "latest_until": "2026-11-10T06:00:00+00:00",
+        "latest_fog_steps": 57
+      }
+    }
+  },
+  "crosscheck_gsod_ghcnh": {
+    "rule": "jours avec au moins 18 heures de température",
+    "locations": {
+      "kiruna": {
+        "days_compared": 5663,
+        "temp_mean_abs_diff_c": 0.086,
+        "temp_bias_c": -0.013,
+        "temp_days_within_0_5c": 0.9965,
+        "fog_day_agreement": 0.953
+      },
+      "rovaniemi": {
+        "days_compared": 5287,
+        "temp_mean_abs_diff_c": 0.026,
+        "temp_bias_c": 0.008,
+        "temp_days_within_0_5c": 0.9975,
+        "fog_day_agreement": 0.9856
+      },
+      "tromso": {
+        "days_compared": 5533,
+        "temp_mean_abs_diff_c": 0.04,
+        "temp_bias_c": -0.001,
+        "temp_days_within_0_5c": 0.9928,
+        "fog_day_agreement": 0.9975
+      }
+    }
+  }
+}
