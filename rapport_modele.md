@@ -1,6 +1,6 @@
 # Modèle Kp ≥ 4 dans les 6 h
 
-Entraîné le 2026-11-01 16:49 UTC. Seuil d'alerte (choisi sur la validation) : **0.21**. Modèle en service appris sur 49186 tranches (jusqu'au 2026-11-01).
+Entraîné le 2026-11-02 20:22 UTC. Seuil d'alerte (choisi sur la validation) : **0.21**. Modèle en service appris sur 49193 tranches (jusqu'au 2026-11-02).
 
 | Période | Méthode | ROC AUC | PR AUC | Brier | Précision | Rappel | F1 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -8,7 +8,7 @@ Entraîné le 2026-11-01 16:49 UTC. Seuil d'alerte (choisi sur la validation) : 
 | validation | persistance | 0.726 | 0.241 | 0.237 | 0.297 | 0.678 | 0.413 |
 | validation | climatologie | 0.552 | 0.145 | 0.110 | 0.142 | 0.386 | 0.208 |
 | test | modele | 0.905 | 0.728 | 0.077 | 0.545 | 0.769 | 0.638 |
-| test | persistance | 0.758 | 0.326 | 0.242 | 0.378 | 0.757 | 0.504 |
+| test | persistance | 0.757 | 0.325 | 0.243 | 0.377 | 0.757 | 0.503 |
 | test | climatologie | 0.533 | 0.173 | 0.143 | 0.183 | 0.397 | 0.250 |
 
 Coefficients du modèle évalué (variables centrées-réduites : comparables entre elles) :
@@ -29,20 +29,20 @@ Coefficients du modèle évalué (variables centrées-réduites : comparables en
 | doy_sin | -0.046 |
 | doy_cos | -0.049 |
 
-Dernière tranche (2026-11-01 09:00 UTC) : probabilité **15%** → pas d’alerte.
+Dernière tranche (2026-11-02 06:00 UTC) : probabilité **7%** → pas d’alerte.
 
 # Modèle Kp ≥ 4 dans les 24 h
 
-Entraîné le 2026-11-01 16:49 UTC. Seuil d'alerte (choisi sur la validation) : **0.24**. Modèle en service appris sur 49180 tranches (jusqu'au 2026-10-31).
+Entraîné le 2026-11-02 20:22 UTC. Seuil d'alerte (choisi sur la validation) : **0.24**. Modèle en service appris sur 49187 tranches (jusqu'au 2026-11-01).
 
 | Période | Méthode | ROC AUC | PR AUC | Brier | Précision | Rappel | F1 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | validation | modele | 0.750 | 0.598 | 0.163 | 0.496 | 0.666 | 0.569 |
 | validation | persistance | 0.642 | 0.379 | 0.289 | 0.483 | 0.485 | 0.484 |
 | validation | climatologie | 0.546 | 0.315 | 0.211 | 0.309 | 0.638 | 0.416 |
-| test | modele | 0.812 | 0.717 | 0.155 | 0.539 | 0.779 | 0.637 |
-| test | persistance | 0.679 | 0.463 | 0.282 | 0.568 | 0.566 | 0.567 |
-| test | climatologie | 0.540 | 0.347 | 0.241 | 0.350 | 0.626 | 0.449 |
+| test | modele | 0.813 | 0.717 | 0.155 | 0.539 | 0.780 | 0.637 |
+| test | persistance | 0.679 | 0.464 | 0.282 | 0.568 | 0.567 | 0.568 |
+| test | climatologie | 0.540 | 0.348 | 0.242 | 0.350 | 0.626 | 0.449 |
 
 Coefficients du modèle évalué (variables centrées-réduites : comparables entre elles) :
 
@@ -62,11 +62,11 @@ Coefficients du modèle évalué (variables centrées-réduites : comparables en
 | doy_sin | -0.042 |
 | doy_cos | -0.038 |
 
-Dernière tranche (2026-11-01 09:00 UTC) : probabilité **37%** → alerte.
+Dernière tranche (2026-11-02 06:00 UTC) : probabilité **22%** → pas d’alerte.
 
 # Modèle Kp ≥ 4 dans les 48 h
 
-Entraîné le 2026-11-01 16:49 UTC. Seuil d'alerte (choisi sur la validation) : **0.17**. Modèle en service appris sur 49172 tranches (jusqu'au 2026-10-30).
+Entraîné le 2026-11-02 20:22 UTC. Seuil d'alerte (choisi sur la validation) : **0.17**. Modèle en service appris sur 49179 tranches (jusqu'au 2026-10-31).
 
 | Période | Méthode | ROC AUC | PR AUC | Brier | Précision | Rappel | F1 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -74,8 +74,8 @@ Entraîné le 2026-11-01 16:49 UTC. Seuil d'alerte (choisi sur la validation) : 
 | validation | persistance | 0.609 | 0.503 | 0.360 | 0.615 | 0.407 | 0.490 |
 | validation | climatologie | 0.551 | 0.470 | 0.267 | 0.427 | 0.833 | 0.564 |
 | test | modele | 0.745 | 0.738 | 0.204 | 0.488 | 0.967 | 0.649 |
-| test | persistance | 0.624 | 0.553 | 0.364 | 0.657 | 0.458 | 0.540 |
-| test | climatologie | 0.530 | 0.482 | 0.286 | 0.477 | 0.869 | 0.616 |
+| test | persistance | 0.625 | 0.554 | 0.364 | 0.657 | 0.458 | 0.540 |
+| test | climatologie | 0.530 | 0.482 | 0.286 | 0.477 | 0.870 | 0.616 |
 
 Coefficients du modèle évalué (variables centrées-réduites : comparables entre elles) :
 
@@ -95,4 +95,4 @@ Coefficients du modèle évalué (variables centrées-réduites : comparables en
 | doy_sin | -0.039 |
 | doy_cos | -0.054 |
 
-Dernière tranche (2026-11-01 09:00 UTC) : probabilité **51%** → alerte.
+Dernière tranche (2026-11-02 06:00 UTC) : probabilité **36%** → alerte.
