@@ -88,7 +88,7 @@ def ghcnh(work: Path) -> bool:
 
 
 def transform(work: Path) -> bool:
-    from auroracast.app import predict
+    from auroracast.app import analysis, predict
     from auroracast.model import history
     from auroracast.transform import __main__ as tr
     from auroracast.warehouse import load
@@ -116,6 +116,7 @@ def transform(work: Path) -> bool:
     else:
         _log("aucun modèle dans le conteneur models : lancer d'abord la tâche train")
         ok = False
+    ok &= _run("analyse saisonnière", analysis.main, ["--out", str(site)])
     if site.is_dir():
         _log(f"site : {_s('site').upload(site)} fichiers publiés")
     return ok

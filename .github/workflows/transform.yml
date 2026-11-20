@@ -75,7 +75,8 @@ jobs:
             DATABASE_URL="$NEON_DATABASE_URL" python -m auroracast.model.history suivi --ref origin/models --models models --out site
           fi
           DATABASE_URL="$NEON_DATABASE_URL" python -m auroracast.app.predict --out site --models models
-          cp web/index.html web/suivi.html site/
+          DATABASE_URL="$NEON_DATABASE_URL" python -m auroracast.app.analysis --out site
+          cp web/index.html web/suivi.html web/analyse.html site/
 
       - name: Préparer la publication de l'application
         if: env.NEON_DATABASE_URL != ''

@@ -7,6 +7,7 @@
 Routes :
     GET  /                       page des prévisions des 48 h (lit /forecast.json)
     GET  /suivi.html             page de suivi des modèles (lit /suivi_modeles.json)
+    GET  /analyse.html           quand et où voir les aurores : mois × lieu, saisons, tests (lit /analyse.json)
     GET  /forecast.json          prévisions calculées par la tâche « transform »
     GET  /suivi_modeles.json     historique des modèles
     GET  /api/health             état : modèles chargés, prévision disponible et son âge
@@ -41,8 +42,8 @@ from auroracast.model.train import FEATURES, HORIZONS, model_file
 
 CACHE_SECONDS = 300
 WEB_DIR = Path(os.environ.get("AURORACAST_WEB_DIR", Path(__file__).resolve().parents[3] / "web"))
-PAGES = {"": "index.html", "index.html": "index.html", "suivi.html": "suivi.html"}
-DATA_FILES = ("forecast.json", "suivi_modeles.json")
+PAGES = {"": "index.html", "index.html": "index.html", "suivi.html": "suivi.html", "analyse.html": "analyse.html"}
+DATA_FILES = ("forecast.json", "suivi_modeles.json", "analyse.json")
 
 app = FastAPI(title="AuroraCast", version="1.0",
               description="Prévision de la visibilité des aurores boréales (Tromsø, Kiruna, Rovaniemi).",

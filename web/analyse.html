@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Quand et où voir les aurores</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Analyse saisonnière : chiffres clés → carte mois × lieu → saisons de l'activité → ciel → cycle solaire → tests → recommandations */
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; }
+:root {
+  --bg: #eef1f6; --surface: #ffffff; --ink: #141a2b; --muted: #5a6378; --line: #d6dbe6; --grid: #e7eaf1;
+  --accent: #3b4fd8; --band: #eef1f6; --empty: #f0efec;
+  /* lieux : 3 premiers emplacements de la palette catégorielle validée (tous couples séparables) */
+  --c-tromso: #2a78d6; --c-kiruna: #eb6834; --c-rovaniemi: #1baf7a;
+  /* rampe séquentielle bleue, clair → foncé (heatmap) */
+  --q0: #cde2fb; --q1: #9ec5f4; --q2: #6da7ec; --q3: #3987e5; --q4: #256abf; --q5: #184f95; --q6: #0d366b;
+  --q-ink-dark: #0b1a33; --q-ink-light: #ffffff;
+  --f-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --f-data: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) {
+  --bg: #0b1020; --surface: #131a2f; --ink: #e8ecf6; --muted: #98a2bb; --line: #263052; --grid: #1d2542;
+  --accent: #8b9bff; --band: #182039; --empty: #383835;
+  --c-tromso: #3987e5; --c-kiruna: #d95926; --c-rovaniemi: #199e70;
+  /* sombre : la valeur faible se fond dans la surface, la forte s'éclaire */
+  --q0: #104281; --q1: #184f95; --q2: #256abf; --q3: #3987e5; --q4: #6da7ec; --q5: #9ec5f4; --q6: #cde2fb;
+  --q-ink-dark: #0b1a33; --q-ink-light: #ffffff; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0b1020; --surface: #131a2f; --ink: #e8ecf6; --muted: #98a2bb; --line: #263052; --grid: #1d2542;
+  --accent: #8b9bff; --band: #182039; --empty: #383835;
+  --c-tromso: #3987e5; --c-kiruna: #d95926; --c-rovaniemi: #199e70;
+  --q0: #104281; --q1: #184f95; --q2: #256abf; --q3: #3987e5; --q4: #6da7ec; --q5: #9ec5f4; --q6: #cde2fb;
+  color-scheme: dark }
+
+body { background: var(--bg); color: var(--ink); font-family: var(--f-display); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1000px; margin: 0 auto; padding-block: 24px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 20px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; }
+h1 { font-weight: 700; font-size: 1.6rem; letter-spacing: -0.01em; margin: 0; }
+h1 span { color: var(--accent); }
+h1 small { font-size: 1rem; font-weight: 500; color: var(--muted); }
+h2 { font-size: 1.15rem; margin: 0; text-wrap: balance; }
+a { color: var(--accent); }
+.stamp { color: var(--muted); font-size: .85rem; font-family: var(--f-data); }
+.label { text-transform: uppercase; letter-spacing: .08em; font-size: .72rem; color: var(--muted); font-weight: 600; }
+.num { font-family: var(--f-data); font-variant-numeric: tabular-nums; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; display: grid; gap: 12px; min-width: 0; }
+.card > * { min-width: 0; }
+.card p { margin: 0; max-width: 72ch; color: var(--muted); }
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 2px; min-width: 0; }
+.tile .v { font-size: 1.5rem; font-weight: 600; }
+.tile .s { color: var(--muted); font-size: .82rem; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: .88rem; align-items: center; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.ramp { display: inline-flex; border-radius: 3px; overflow: hidden; }
+.ramp b { width: 18px; height: 10px; display: inline-block; }
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { fill: var(--muted); font-family: var(--f-data); font-size: 11px; }
+.chart .gridline { stroke: var(--grid); }
+.chart .axis { stroke: var(--line); }
+.chart .band { fill: var(--band); }
+.heat { display: grid; grid-template-columns: 92px repeat(12, minmax(0, 1fr)); gap: 2px; font-family: var(--f-data); font-size: .8rem; }
+.heat .h { color: var(--muted); text-align: center; font-size: .72rem; padding-bottom: 2px; }
+.heat .rowname { display: flex; align-items: center; gap: 6px; font-family: var(--f-display); font-weight: 600; }
+.heat .rowname i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.heat .cell { height: 44px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: 500; cursor: default; }
+.heat .cell.none { background: var(--empty); color: var(--muted); }
+.heat .cell:hover, .heat .cell:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 10px; font-size: .8rem; box-shadow: 0 4px 14px rgb(0 0 0 / .12); min-width: 190px; z-index: 2; }
+.tip b { display: block; margin-bottom: 2px; }
+.tip div { display: flex; justify-content: space-between; gap: 12px; }
+.tests { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.test { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; display: grid; gap: 6px; }
+.test .verdict { font-weight: 600; }
+.test dl { display: grid; grid-template-columns: auto auto; gap: 2px 12px; margin: 0; font-size: .85rem; }
+.test dt { color: var(--muted); }
+.test dd { margin: 0; text-align: right; font-family: var(--f-data); }
+ol.recos { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .82rem; }
+th, td { text-align: right; padding: 5px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+th { color: var(--muted); font-weight: 600; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; }
+details summary { cursor: pointer; color: var(--accent); font-size: .88rem; }
+footer { color: var(--muted); font-size: .82rem; display: grid; gap: 4px; }
+.scroll { overflow-x: auto; }
+@media (max-width: 760px) {
+  .tiles, .tests { grid-template-columns: minmax(0, 1fr); }
+  /* petit écran : les graphiques gardent une taille lisible et défilent horizontalement */
+  .heat { min-width: 620px; }
+  .chart svg { min-width: 640px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Aurora<span>Cast</span> <small>quand et où voir les aurores</small></h1>
+    <div class="stamp" id="stamp">Chargement…</div>
+  </header>
+  <div><a href="index.html">← Prévisions des 48 h</a> · <a href="suivi.html">Suivi des modèles</a></div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <section class="card" aria-labelledby="t1">
+    <div class="label">1 · Meilleurs mois et meilleurs lieux</div>
+    <h2 id="t1">Nuits favorables par an : nuit noire, ciel dégagé et belle aurore (Kp ≥ 4) en même temps</h2>
+    <p>Moyenne sur les années complètes observées. Une case grise : pas de nuit noire ce mois-là (soleil de minuit ou crépuscule permanent). Survolez une case pour le détail.</p>
+    <div class="legend"><span>Moins</span><span class="ramp" id="ramp"></span><span>Plus de nuits favorables</span></div>
+    <div class="chart scroll"><div class="heat" id="heat" role="table" aria-label="Nuits favorables par an, par lieu et par mois"></div></div>
+    <details><summary>Voir le tableau détaillé (12 mois × 3 lieux)</summary><div class="tablewrap" id="table1"></div></details>
+  </section>
+
+  <section class="card" aria-labelledby="t2">
+    <div class="label">2 · Saisons de l'activité aurorale</div>
+    <h2 id="t2">Part des tranches de 3 h avec une belle aurore (Kp ≥ 4), par mois, depuis 1932</h2>
+    <p>Bande claire : intervalle de confiance à 95 %. Colonnes grisées : mois d'équinoxe (mars-avril, septembre-octobre).</p>
+    <div class="scroll"><div class="chart" id="chart2"></div></div>
+  </section>
+
+  <section class="card" aria-labelledby="t3">
+    <div class="label">3 · Le ciel</div>
+    <h2 id="t3">Part des heures noires au ciel dégagé, par mois et par lieu</h2>
+    <p>Nuages ≤ 2 octas et pas de brouillard, d'après les stations météo de chaque lieu. Pas de valeur l'été : il n'y a pas de nuit noire.</p>
+    <div class="legend" id="legend3"></div>
+    <div class="scroll"><div class="chart" id="chart3"></div></div>
+  </section>
+
+  <section class="card" aria-labelledby="t4">
+    <div class="label">4 · Le cycle solaire</div>
+    <h2 id="t4">Part des tranches avec une belle aurore, année par année</h2>
+    <p>L'activité suit le cycle du Soleil, d'environ 11 ans. La ligne pointillée donne la moyenne depuis 1932.</p>
+    <div class="scroll"><div class="chart" id="chart4"></div></div>
+  </section>
+
+  <section class="card" aria-labelledby="t5">
+    <div class="label">5 · Tests d'hypothèses</div>
+    <h2 id="t5">Ce que les données confirment</h2>
+    <div class="tests" id="tests"></div>
+  </section>
+
+  <section class="card" aria-labelledby="t6">
+    <div class="label">6 · Recommandations</div>
+    <h2 id="t6">Pour programmer les séjours</h2>
+    <ol class="recos" id="recos"></ol>
+  </section>
+
+  <footer id="footer"></footer>
+</div>
+
+<script>
+const MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+const MOIS_L = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+const COL = { tromso: "var(--c-tromso)", kiruna: "var(--c-kiruna)", rovaniemi: "var(--c-rovaniemi)" };
+const NS = "http://www.w3.org/2000/svg";
+const svgEl = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+const fr = (v, d = 1) => v == null || isNaN(v) ? "–" : v.toFixed(d).replace(".", ",");
+const pct = (v, d = 0) => v == null || isNaN(v) ? "–" : (v * 100).toFixed(d).replace(".", ",") + " %";
+const sci = p => p < 0.001 ? "< 0,001" : fr(p, 3);
+
+function tooltip(box) {
+  const tip = document.createElement("div"); tip.className = "tip"; tip.hidden = true; box.append(tip);
+  return {
+    show(html, x, y) {
+      tip.innerHTML = html; tip.hidden = false;
+      const w = box.clientWidth, tw = tip.offsetWidth;
+      tip.style.left = Math.min(Math.max(0, x + 12), Math.max(0, w - tw)) + "px"; tip.style.top = (y + 12) + "px";
+    },
+    hide() { tip.hidden = true; },
+  };
+}
+
+/* ---------------------------------------------------------------- 1. heatmap mois × lieu */
+function renderHeat(D) {
+  const ramp = document.getElementById("ramp");
+  ramp.innerHTML = [0, 1, 2, 3, 4, 5, 6].map(i => `<b style="background:var(--q${i})"></b>`).join("");
+  const heat = document.getElementById("heat");
+  const vals = D.mois_lieu.filter(r => r.heures_noires_an >= 1).map(r => r.nuits_favorables_an);
+  const max = Math.max(...vals, 0.1);
+  const step = v => Math.min(6, Math.floor((v / max) * 7));
+  let html = `<div></div>` + MOIS.map(m => `<div class="h" role="columnheader">${m}</div>`).join("");
+  for (const L of D.lieux) {
+    html += `<div class="rowname" role="rowheader"><i style="background:${COL[L.code]}"></i>${L.nom}</div>`;
+    for (let m = 1; m <= 12; m++) {
+      const r = D.mois_lieu.find(x => x.lieu === L.code && x.mois === m);
+      if (!r || r.heures_noires_an < 1) { html += `<div class="cell none" role="cell" tabindex="0" data-l="${L.code}" data-m="${m}">–</div>`; continue; }
+      const s = step(r.nuits_favorables_an);
+      html += `<div class="cell" role="cell" tabindex="0" data-l="${L.code}" data-m="${m}" style="background:var(--q${s});color:var(${s >= 3 ? "--q-ink-light" : "--q-ink-dark"})">${fr(r.nuits_favorables_an)}</div>`;
+    }
+  }
+  heat.innerHTML = html;
+  const tip = tooltip(heat.parentElement);
+  const show = ev => {
+    const c = ev.target.closest(".cell"); if (!c) return;
+    const r = D.mois_lieu.find(x => x.lieu === c.dataset.l && x.mois === +c.dataset.m);
+    const nom = D.lieux.find(l => l.code === c.dataset.l).nom;
+    const box = heat.parentElement.getBoundingClientRect(), cb = c.getBoundingClientRect();
+    tip.show(`<b>${nom}, ${MOIS_L[+c.dataset.m - 1]}</b>` + (r && r.heures_noires_an >= 1 ?
+      `<div><span>Nuits favorables / an</span><span class="num">${fr(r.nuits_favorables_an)}</span></div>
+       <div><span>Heures favorables / an</span><span class="num">${fr(r.heures_favorables_an)}</span></div>
+       <div><span>Heures noires / an</span><span class="num">${fr(r.heures_noires_an, 0)}</span></div>
+       <div><span>Belle aurore (Kp ≥ 4)</span><span class="num">${pct(r.part_kp4)}</span></div>
+       <div><span>Ciel dégagé</span><span class="num">${pct(r.part_degage)}</span></div>
+       <div><span>Ciel observé</span><span class="num">${pct(r.couverture_ciel)}</span></div>` :
+      `<div><span>Pas de nuit noire</span></div>`), cb.left - box.left, cb.bottom - box.top - 8);
+  };
+  heat.addEventListener("mouseover", show); heat.addEventListener("focusin", show);
+  heat.addEventListener("mouseleave", () => tip.hide()); heat.addEventListener("focusout", () => tip.hide());
+
+  const rows = D.lieux.flatMap(L => D.mois_lieu.filter(r => r.lieu === L.code).map(r => ({ ...r, nom: L.nom })));
+  document.getElementById("table1").innerHTML = `<table><thead><tr><th>Lieu</th><th>Mois</th><th>Nuits fav. / an</th><th>Heures fav. / an</th><th>Heures noires / an</th><th>Kp ≥ 4</th><th>Ciel dégagé</th><th>Ciel observé</th><th>Sans Lune gênante</th></tr></thead><tbody>${
+    rows.map(r => `<tr><td>${r.nom}</td><td>${MOIS_L[r.mois - 1]}</td><td class="num">${fr(r.nuits_favorables_an)}</td><td class="num">${fr(r.heures_favorables_an)}</td><td class="num">${fr(r.heures_noires_an, 0)}</td><td class="num">${pct(r.part_kp4)}</td><td class="num">${pct(r.part_degage)}</td><td class="num">${pct(r.couverture_ciel)}</td><td class="num">${pct(r.part_sans_lune)}</td></tr>`).join("")
+  }</tbody></table>`;
+}
+
+/* ---------------------------------------------------------------- courbe générique, axe unique */
+function lineChart(id, xs, series, { yMax, yTicks, xLabel, bands = [], ref, tipFn, H = 260 }) {
+  const box = document.getElementById(id); box.innerHTML = "";
+  const W = 900, m = { l: 46, r: 92, t: 10, b: 26 };
+  const x = i => m.l + (xs.length < 2 ? 0 : i * (W - m.l - m.r) / (xs.length - 1));
+  const y = v => m.t + (yMax - v) * (H - m.t - m.b) / yMax;
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": document.getElementById(id).closest("section").querySelector("h2").textContent });
+  const half = xs.length > 1 ? (W - m.l - m.r) / (xs.length - 1) / 2 : 10;
+  bands.forEach(i => svg.append(svgEl("rect", { x: x(i) - half, y: m.t, width: 2 * half, height: H - m.t - m.b, class: "band" })));
+  yTicks.forEach(v => {
+    svg.append(svgEl("line", { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), class: "gridline" }));
+    const t = svgEl("text", { x: m.l - 6, y: y(v) + 4, "text-anchor": "end" }); t.textContent = pct(v); svg.append(t);
+  });
+  svg.append(svgEl("line", { x1: m.l, x2: W - m.r, y1: H - m.b, y2: H - m.b, class: "axis" }));
+  xs.forEach((v, i) => { const s = xLabel(v, i); if (!s) return;
+    const t = svgEl("text", { x: x(i), y: H - 8, "text-anchor": "middle" }); t.textContent = s; svg.append(t); });
+  if (ref != null) {
+    svg.append(svgEl("line", { x1: m.l, x2: W - m.r, y1: y(ref.v), y2: y(ref.v), stroke: "var(--muted)", "stroke-dasharray": "4 4", "stroke-width": 1 }));
+    const t = svgEl("text", { x: W - m.r + 6, y: y(ref.v) + 4 }); t.textContent = ref.label; svg.append(t);
+  }
+  series.forEach(s => {
+    if (s.lo && s.hi) {
+      let d = ""; s.hi.forEach((v, i) => { d += (i ? "L" : "M") + x(i).toFixed(1) + "," + y(v).toFixed(1); });
+      for (let i = s.lo.length - 1; i >= 0; i--) d += "L" + x(i).toFixed(1) + "," + y(s.lo[i]).toFixed(1);
+      svg.append(svgEl("path", { d: d + "Z", fill: s.color, "fill-opacity": 0.15, stroke: "none" }));
+    }
+    let d = "";
+    s.values.forEach((v, i) => { if (v == null) return; d += (d && s.values[i - 1] != null ? "L" : "M") + x(i).toFixed(1) + "," + y(v).toFixed(1); });
+    svg.append(svgEl("path", { d, fill: "none", stroke: s.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    if (s.label) {
+      const last = s.values.reduce((a, v, i) => v != null ? i : a, -1);
+      if (last >= 0) { const t = svgEl("text", { x: W - m.r + 6, y: y(s.values[last]) + 4 }); t.textContent = s.label; svg.append(t); }
+    }
+  });
+  const cross = svgEl("line", { y1: m.t, y2: H - m.b, stroke: "var(--muted)", "stroke-width": 1, visibility: "hidden" });
+  svg.append(cross);
+  const dots = series.map(s => { const c = svgEl("circle", { r: 4.5, fill: s.color, stroke: "var(--surface)", "stroke-width": 2, visibility: "hidden" }); svg.append(c); return c; });
+  const hit = svgEl("rect", { x: m.l - half, y: 0, width: W - m.l - m.r + 2 * half, height: H, fill: "transparent" });
+  svg.append(hit); box.append(svg);
+  const tip = tooltip(box);
+  hit.addEventListener("mousemove", ev => {
+    const p = svg.createSVGPoint(); p.x = ev.clientX; p.y = ev.clientY;
+    const q = p.matrixTransform(svg.getScreenCTM().inverse());
+    const i = Math.max(0, Math.min(xs.length - 1, Math.round((q.x - m.l) / ((W - m.l - m.r) / Math.max(1, xs.length - 1)))));
+    cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("visibility", "visible");
+    series.forEach((s, k) => { const v = s.values[i];
+      if (v == null) { dots[k].setAttribute("visibility", "hidden"); return; }
+      dots[k].setAttribute("cx", x(i)); dots[k].setAttribute("cy", y(v)); dots[k].setAttribute("visibility", "visible"); });
+    const r = box.getBoundingClientRect();
+    tip.show(tipFn(i), ev.clientX - r.left, ev.clientY - r.top);
+  });
+  hit.addEventListener("mouseleave", () => { tip.hide(); cross.setAttribute("visibility", "hidden"); dots.forEach(d => d.setAttribute("visibility", "hidden")); });
+}
+
+const ceil = (v, s) => Math.ceil(v / s) * s;
+
+function renderKpMonths(D) {
+  const k = D.kp_mois, vals = k.map(r => r.frequence_kp4), hi = k.map(r => r.ic95[1]), lo = k.map(r => r.ic95[0]);
+  const yMax = ceil(Math.max(...hi) * 1.1, 0.05);
+  lineChart("chart2", MOIS, [{ values: vals, lo, hi, color: "var(--c-tromso)" }], {
+    yMax, yTicks: [0, yMax / 2, yMax], xLabel: v => v, bands: [2, 3, 8, 9],
+    tipFn: i => `<b>${MOIS_L[i]}</b><div><span>Kp ≥ 4</span><span class="num">${pct(vals[i], 1)}</span></div><div><span>IC 95 %</span><span class="num">${pct(lo[i], 1)} – ${pct(hi[i], 1)}</span></div><div><span>Tranches</span><span class="num">${k[i].tranches.toLocaleString("fr-FR")}</span></div>`,
+  });
+}
+
+function renderClear(D) {
+  const series = D.lieux.map(L => ({
+    label: L.nom, color: COL[L.code],
+    values: MOIS.map((_, i) => { const r = D.mois_lieu.find(x => x.lieu === L.code && x.mois === i + 1); return r && r.heures_noires_an >= 1 ? r.part_degage : null; }),
+  }));
+  document.getElementById("legend3").innerHTML = D.lieux.map(L => `<span><i style="background:${COL[L.code]}"></i>${L.nom}</span>`).join("");
+  const yMax = ceil(Math.max(...series.flatMap(s => s.values.filter(v => v != null))) * 1.1, 0.1);
+  lineChart("chart3", MOIS, series, {
+    yMax, yTicks: [0, yMax / 2, yMax], xLabel: v => v,
+    tipFn: i => `<b>${MOIS_L[i]}</b>` + series.map(s => `<div><span>${s.label}</span><span class="num">${pct(s.values[i])}</span></div>`).join(""),
+  });
+}
+
+function renderCycle(D) {
+  const k = D.kp_annee.filter(r => r.tranches > 2000);
+  const vals = k.map(r => r.frequence_kp4);
+  const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+  const yMax = ceil(Math.max(...vals) * 1.1, 0.05);
+  lineChart("chart4", k.map(r => r.annee), [{ values: vals, color: "var(--c-tromso)" }], {
+    yMax, yTicks: [0, yMax / 2, yMax], ref: { v: mean, label: "moyenne" },
+    xLabel: (v, i) => (v % 10 === 0 || i === k.length - 1) ? String(v) : "",
+    tipFn: i => `<b>${k[i].annee}</b><div><span>Kp ≥ 4</span><span class="num">${pct(vals[i], 1)}</span></div>`,
+  });
+}
+
+function renderTests(D) {
+  const e = D.tests.equinoxes, c = D.tests.ciel_degage;
+  const names = Object.fromEntries(D.lieux.map(l => [l.code, l.nom]));
+  document.getElementById("tests").innerHTML = `
+    <div class="test"><div class="label">H1 · Équinoxes</div><div>${e.hypothese}</div>
+      <div class="verdict">${e.conclusion}</div>
+      <dl><dt>Kp ≥ 4 aux équinoxes</dt><dd>${pct(e.khi2.frequence_equinoxes, 1)}</dd>
+          <dt>Kp ≥ 4 aux solstices</dt><dd>${pct(e.khi2.frequence_solstices, 1)}</dd>
+          <dt>Rapport</dt><dd>× ${fr(e.khi2.rapport, 2)}</dd>
+          <dt>Khi² (p-valeur)</dt><dd>${sci(e.khi2.p_valeur)}</dd>
+          <dt>V de Cramér</dt><dd>${fr(e.khi2.v_cramer, 3)}</dd>
+          <dt>Kruskal-Wallis, 4 saisons (p)</dt><dd>${sci(e.kruskal_wallis.p_valeur)}</dd></dl></div>
+    <div class="test"><div class="label">H2 · Ciel dégagé selon le lieu</div><div>${c.hypothese}</div>
+      <div class="verdict">${c.conclusion}</div>
+      <dl>${Object.entries(c.part_degage).map(([k, v]) => `<dt>${names[k] || k}</dt><dd>${pct(v, 1)}</dd>`).join("")}
+          <dt>Khi² (p-valeur)</dt><dd>${sci(c.p_valeur)}</dd>
+          <dt>V de Cramér</dt><dd>${fr(c.v_cramer, 3)}</dd></dl></div>`;
+}
+
+function renderTiles(D) {
+  const season = [9, 10, 11, 12, 1, 2, 3];
+  const per = D.lieux.map(L => ({ L, n: D.mois_lieu.filter(r => r.lieu === L.code && season.includes(r.mois)).reduce((a, r) => a + r.nuits_favorables_an, 0) }))
+    .sort((a, b) => b.n - a.n);
+  const best = [...D.mois_lieu].sort((a, b) => b.nuits_favorables_an - a.nuits_favorables_an)[0];
+  const e = D.tests.equinoxes.khi2;
+  document.getElementById("tiles").innerHTML = `
+    <div class="tile"><span class="label">Meilleur lieu (saison)</span><span class="v">${per[0].L.nom}</span><span class="s"><span class="num">${fr(per[0].n, 0)}</span> nuits favorables par an, de septembre à mars</span></div>
+    <div class="tile"><span class="label">Meilleure période</span><span class="v">${MOIS_L[best.mois - 1]}</span><span class="s">à ${D.lieux.find(l => l.code === best.lieu).nom} : <span class="num">${fr(best.nuits_favorables_an)}</span> nuits favorables par an</span></div>
+    <div class="tile"><span class="label">Équinoxes</span><span class="v">× ${fr(e.rapport, 1)}</span><span class="s">belles aurores qu'aux solstices (depuis 1932)</span></div>`;
+}
+
+async function main() {
+  const res = await fetch("analyse.json", { cache: "no-store" });
+  if (!res.ok) { document.getElementById("stamp").textContent = "Analyse pas encore calculée"; return; }
+  const D = await res.json();
+  document.getElementById("stamp").textContent = `Années ${D.periode.debut.slice(0, 4)}–${+D.periode.fin_exclue.slice(0, 4) - 1} · calculé le ${new Date(D.genere_utc).toLocaleDateString("fr-FR")}`;
+  renderTiles(D); renderHeat(D); renderKpMonths(D); renderClear(D); renderCycle(D); renderTests(D);
+  document.getElementById("recos").innerHTML = D.recommandations.map(r => `<li>${r}</li>`).join("");
+  document.getElementById("footer").innerHTML = `<div>Définitions : heure noire = ${D.definitions.heure_noire} ; heure dégagée = ${D.definitions.heure_degagee} ; heure favorable = ${D.definitions.heure_favorable} ; nuit favorable = ${D.definitions.nuit_favorable}.</div><div>Sources : Kp GFZ Potsdam (CC BY 4.0) et NOAA SWPC ; nuages NOAA GHCNh (CC0) ; Soleil et Lune calculés (PyEphem). Méthode : docs/plan_analyse.md.</div>`;
+}
+main();
+</script>
+</body>
+</html>

@@ -43,6 +43,7 @@ def test_pages_and_data(client):
     r = client.get("/")
     assert r.status_code == 200 and "forecast.json" in r.text
     assert client.get("/suivi.html").status_code == 200
+    assert "analyse.json" in client.get("/analyse.html").text
     assert client.get("/forecast.json").json()["genere_utc"] == "2026-11-20T09:00Z"
     assert client.get("/suivi_modeles.json").status_code == 503      # pas encore calculé
     assert client.get("/../pyproject.toml").status_code == 404
