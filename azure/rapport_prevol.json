@@ -133,7 +133,7 @@
         },
         {
           "nom_logique": "id-auroracast-github",
-          "role": "Container Apps Contributor",
+          "role": "Container Apps Contributor + Container Apps Jobs Contributor",
           "portee": "groupe de ressources rg-auroracast-tp3 (changer l'image des apps ; aucun accès aux données ni aux secrets)"
         }
       ],

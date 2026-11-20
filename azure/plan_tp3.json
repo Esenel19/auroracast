@@ -56,7 +56,7 @@
     {
       "nom_logique": "id-auroracast-github",
       "type": "identite_geree_github",
-      "role": "Container Apps Contributor",
+      "role": "Container Apps Contributor + Container Apps Jobs Contributor",
       "portee": "groupe de ressources rg-auroracast-tp3 (changer l'image des apps ; aucun accès aux données ni aux secrets)",
       "federation": "repo:Esenel19@79450710/auroracast@1434834270:ref:refs/heads/main (format GitHub avec identifiants numériques du compte et du dépôt)"
     },

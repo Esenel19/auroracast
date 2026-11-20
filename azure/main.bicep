@@ -29,7 +29,7 @@ param proprietaire string = 'elodie'
 @description('Image publiée sur GitHub Container Registry (paquet public)')
 param image string = 'ghcr.io/esenel19/auroracast:latest'
 
-@description('Sujet OIDC exact envoyé par GitHub (branche main). GitHub y inclut les identifiants numériques du compte et du dépôt : le recopier depuis le journal de azure/login en cas d'erreur AADSTS700213')
+@description('Sujet OIDC exact envoyé par GitHub (branche main). GitHub y inclut les identifiants numériques du compte et du dépôt : le recopier depuis le journal de azure/login si Azure renvoie AADSTS700213')
 param githubSubject string = 'repo:Esenel19@79450710/auroracast@1434834270:ref:refs/heads/main'
 
 @description('Adresse e-mail des alertes')
@@ -77,6 +77,7 @@ var roles = {
   kvSecretsUser: '4633458b-17de-408a-b874-0445c86b69e6'
   kvSecretsOfficer: 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7'
   containerAppsContributor: '358470bc-b998-42bd-ab17-a7e34c199c0f'
+  containerAppsJobsContributor: '4e3d2b60-56ae-4dc6-a233-09c8e5a82e68'   // Container Apps Contributor ne couvre pas les jobs
 }
 var containerNames = [ 'raw', 'clean', 'models', 'site', 'rapports' ]   // indices 0 à 4
 
@@ -394,14 +395,14 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
 }
 
 // GitHub peut changer l'image des apps et des tâches de ce groupe, rien d'autre (ni données, ni secrets)
-resource githubDeploy 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceGroup().id, idGithub.id, roles.containerAppsContributor)
+resource githubDeploy 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for r in [ roles.containerAppsContributor, roles.containerAppsJobsContributor ]: {
+  name: guid(resourceGroup().id, idGithub.id, r)
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roles.containerAppsContributor)
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', r)
     principalId: idGithub.properties.principalId
     principalType: 'ServicePrincipal'
   }
-}
+}]
 
 // ------------------------------------------------------------------ alertes
 resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
