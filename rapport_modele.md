@@ -1,6 +1,6 @@
 # Modèle Kp ≥ 4 dans les 6 h
 
-Entraîné le 2026-11-19 18:59 UTC. Seuil d'alerte (choisi sur la validation) : **0.21**. Modèle en service appris sur 49299 tranches (jusqu'au 2026-11-19).
+Entraîné le 2026-11-20 18:37 UTC. Seuil d'alerte (choisi sur la validation) : **0.21**. Modèle en service appris sur 49307 tranches (jusqu'au 2026-11-20).
 
 | Période | Méthode | ROC AUC | PR AUC | Brier | Précision | Rappel | F1 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -8,8 +8,8 @@ Entraîné le 2026-11-19 18:59 UTC. Seuil d'alerte (choisi sur la validation) : 
 | validation | persistance | 0.726 | 0.241 | 0.237 | 0.297 | 0.678 | 0.413 |
 | validation | climatologie | 0.552 | 0.145 | 0.110 | 0.142 | 0.386 | 0.208 |
 | test | modele | 0.905 | 0.727 | 0.076 | 0.545 | 0.768 | 0.637 |
-| test | persistance | 0.758 | 0.324 | 0.240 | 0.377 | 0.756 | 0.503 |
-| test | climatologie | 0.533 | 0.172 | 0.141 | 0.183 | 0.397 | 0.250 |
+| test | persistance | 0.758 | 0.323 | 0.241 | 0.376 | 0.756 | 0.502 |
+| test | climatologie | 0.534 | 0.172 | 0.141 | 0.183 | 0.397 | 0.250 |
 
 Coefficients du modèle évalué (variables centrées-réduites : comparables entre elles) :
 
@@ -29,70 +29,68 @@ Coefficients du modèle évalué (variables centrées-réduites : comparables en
 | doy_sin | -0.046 |
 | doy_cos | -0.049 |
 
-Dernière tranche (2026-11-19 06:00 UTC) : probabilité **4%** → pas d’alerte.
+Dernière tranche (2026-11-20 06:00 UTC) : probabilité **1%** → pas d’alerte.
 
 # Modèle Kp ≥ 4 dans les 24 h
 
-Entraîné le 2026-11-19 18:59 UTC. Seuil d'alerte (choisi sur la validation) : **0.24**. Modèle en service appris sur 49293 tranches (jusqu'au 2026-11-18).
+Entraîné le 2026-11-20 18:37 UTC. Seuil d'alerte (choisi sur la validation) : **0.30**. Modèle en service appris sur 49301 tranches (jusqu'au 2026-11-19).
 
 | Période | Méthode | ROC AUC | PR AUC | Brier | Précision | Rappel | F1 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| validation | modele | 0.750 | 0.598 | 0.163 | 0.496 | 0.666 | 0.569 |
+| validation | modele | 0.761 | 0.619 | 0.159 | 0.566 | 0.582 | 0.574 |
 | validation | persistance | 0.642 | 0.379 | 0.289 | 0.483 | 0.485 | 0.484 |
 | validation | climatologie | 0.546 | 0.315 | 0.211 | 0.309 | 0.638 | 0.416 |
-| test | modele | 0.815 | 0.717 | 0.154 | 0.539 | 0.780 | 0.637 |
-| test | persistance | 0.680 | 0.461 | 0.279 | 0.567 | 0.567 | 0.567 |
-| test | climatologie | 0.541 | 0.345 | 0.239 | 0.343 | 0.627 | 0.444 |
+| test | modele | 0.823 | 0.724 | 0.154 | 0.610 | 0.697 | 0.650 |
+| test | persistance | 0.680 | 0.461 | 0.280 | 0.566 | 0.565 | 0.566 |
+| test | climatologie | 0.541 | 0.346 | 0.239 | 0.344 | 0.627 | 0.444 |
 
-Coefficients du modèle évalué (variables centrées-réduites : comparables entre elles) :
+Importance des variables dans la forêt aléatoire (somme = 1) :
 
-| Variable | Coefficient |
+| Variable | Importance |
 | --- | --- |
-| constante | -1.968 |
-| kp | +0.438 |
-| kp_mean_24h | +0.334 |
-| kp_max_24h | -0.083 |
-| kp_max_24h_27d | +0.230 |
-| bz_mean_3h | -0.202 |
-| bz_min_6h | +0.019 |
-| bt_mean_3h | +0.455 |
-| speed_mean_6h | +0.208 |
-| density_mean_6h | +0.381 |
-| f107 | +0.047 |
-| doy_sin | -0.042 |
-| doy_cos | -0.038 |
+| kp | 0.241 |
+| bt_mean_3h | 0.149 |
+| kp_mean_24h | 0.110 |
+| kp_max_24h | 0.094 |
+| bz_min_6h | 0.079 |
+| density_mean_6h | 0.064 |
+| speed_mean_6h | 0.062 |
+| bz_mean_3h | 0.050 |
+| doy_sin | 0.041 |
+| f107 | 0.040 |
+| doy_cos | 0.038 |
+| kp_max_24h_27d | 0.034 |
 
-Dernière tranche (2026-11-19 06:00 UTC) : probabilité **19%** → pas d’alerte.
+Dernière tranche (2026-11-20 06:00 UTC) : probabilité **4%** → pas d’alerte.
 
 # Modèle Kp ≥ 4 dans les 48 h
 
-Entraîné le 2026-11-19 18:59 UTC. Seuil d'alerte (choisi sur la validation) : **0.17**. Modèle en service appris sur 49285 tranches (jusqu'au 2026-11-17).
+Entraîné le 2026-11-20 18:37 UTC. Seuil d'alerte (choisi sur la validation) : **0.27**. Modèle en service appris sur 49293 tranches (jusqu'au 2026-11-18).
 
 | Période | Méthode | ROC AUC | PR AUC | Brier | Précision | Rappel | F1 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| validation | modele | 0.661 | 0.624 | 0.226 | 0.440 | 0.929 | 0.597 |
+| validation | modele | 0.690 | 0.656 | 0.220 | 0.523 | 0.743 | 0.614 |
 | validation | persistance | 0.609 | 0.503 | 0.360 | 0.615 | 0.407 | 0.490 |
 | validation | climatologie | 0.551 | 0.470 | 0.267 | 0.427 | 0.833 | 0.564 |
-| test | modele | 0.748 | 0.737 | 0.202 | 0.484 | 0.967 | 0.645 |
-| test | persistance | 0.626 | 0.551 | 0.361 | 0.656 | 0.459 | 0.540 |
-| test | climatologie | 0.532 | 0.480 | 0.283 | 0.471 | 0.870 | 0.611 |
+| test | modele | 0.752 | 0.746 | 0.206 | 0.568 | 0.836 | 0.676 |
+| test | persistance | 0.626 | 0.551 | 0.362 | 0.656 | 0.458 | 0.539 |
+| test | climatologie | 0.532 | 0.480 | 0.284 | 0.472 | 0.870 | 0.612 |
 
-Coefficients du modèle évalué (variables centrées-réduites : comparables entre elles) :
+Importance des variables dans la forêt aléatoire (somme = 1) :
 
-| Variable | Coefficient |
+| Variable | Importance |
 | --- | --- |
-| constante | -1.116 |
-| kp | +0.324 |
-| kp_mean_24h | +0.277 |
-| kp_max_24h | -0.056 |
-| kp_max_24h_27d | +0.235 |
-| bz_mean_3h | -0.136 |
-| bz_min_6h | +0.006 |
-| bt_mean_3h | +0.287 |
-| speed_mean_6h | -0.013 |
-| density_mean_6h | +0.255 |
-| f107 | +0.098 |
-| doy_sin | -0.039 |
-| doy_cos | -0.054 |
+| kp | 0.236 |
+| bt_mean_3h | 0.141 |
+| kp_mean_24h | 0.105 |
+| kp_max_24h | 0.102 |
+| density_mean_6h | 0.069 |
+| f107 | 0.065 |
+| bz_min_6h | 0.064 |
+| doy_cos | 0.046 |
+| doy_sin | 0.046 |
+| speed_mean_6h | 0.045 |
+| kp_max_24h_27d | 0.043 |
+| bz_mean_3h | 0.039 |
 
-Dernière tranche (2026-11-19 06:00 UTC) : probabilité **33%** → alerte.
+Dernière tranche (2026-11-20 06:00 UTC) : probabilité **21%** → pas d’alerte.
