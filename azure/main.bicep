@@ -29,8 +29,8 @@ param proprietaire string = 'elodie'
 @description('Image publiée sur GitHub Container Registry (paquet public)')
 param image string = 'ghcr.io/esenel19/auroracast:latest'
 
-@description('Dépôt GitHub autorisé à déployer par OIDC (propriétaire/nom)')
-param githubRepo string = 'Esenel19/auroracast'
+@description('Sujet OIDC exact envoyé par GitHub (branche main). GitHub y inclut les identifiants numériques du compte et du dépôt : le recopier depuis le journal de azure/login en cas d'erreur AADSTS700213')
+param githubSubject string = 'repo:Esenel19@79450710/auroracast@1434834270:ref:refs/heads/main'
 
 @description('Adresse e-mail des alertes')
 param alertEmail string
@@ -129,7 +129,7 @@ resource githubFederation 'Microsoft.ManagedIdentity/userAssignedIdentities/fede
   name: 'github-main'
   properties: {
     issuer: 'https://token.actions.githubusercontent.com'
-    subject: 'repo:${githubRepo}:ref:refs/heads/main'
+    subject: githubSubject
     audiences: [ 'api://AzureADTokenExchange' ]
   }
 }
