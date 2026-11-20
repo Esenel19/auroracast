@@ -99,6 +99,23 @@ Le modèle détecte 78 % des belles aurores ; quand il donne l'alerte, il a rais
 
 Plus on prévoit loin, moins c'est précis : le modèle 48 h sert surtout à prévenir qu'une nuit agitée est possible.
 
+## Optimisation des modèles (comparaison, sélection, réglages)
+
+Module `auroracast.model.tune`, exécuté sur Azure chaque dimanche (tâche `caj-auroracast-tune`, rapport dans le conteneur `rapports/optimisation/`). Choix faits sur la validation, et sur une **validation glissante** (2021, 2022, 2023 : chaque année prédite par un modèle appris sur tout ce qui précède) pour le choix final ; le test 2024 → aujourd'hui ne sert qu'à mesurer le gain. Critère : PR AUC (les belles aurores sont rares), puis score de Brier (probabilités fiables).
+
+1. **Algorithmes** : régression logistique, forêt aléatoire, gradient boosting (même famille que XGBoost). La forêt est la meilleure sur la validation aux 3 horizons.
+2. **Variables** : `kp_mean_24h` et `kp_max_24h` sont redondantes (corrélation 0,92). Importance par permutation et élimination descendante : les variables utiles sont `kp`, `bt_mean_3h`, `bz_mean_3h`, vitesse et densité du vent solaire ; la saison, le Kp d'il y a 27 jours et `bz_min_6h` n'apportent rien. Une logistique réduite à 5-7 variables ne gagne pourtant rien sur le test : elle n'est pas retenue.
+3. **Hyperparamètres** : la grille de la logistique (28 réglages) est plate ; la grille de la forêt (taille minimale des feuilles, variables par nœud) est choisie sur la validation glissante.
+4. **Choix et gain mesuré sur le test** (optimisation du 20/11/2026, 14:52 UTC) :
+
+| Horizon | Réglage retenu | ROC AUC test | PR AUC test | F1 test | Décision |
+| --- | --- | --- | --- | --- | --- |
+| 6 h | forêt (feuilles ≥ 25) | +0,003 | −0,005 | +0,009 | Non adopté : la logistique reste |
+| 24 h | forêt (100 arbres, feuilles ≥ 25) | +0,009 | +0,007 | +0,013 | **Adopté** (Brier aussi meilleur) |
+| 48 h | forêt (100 arbres, feuilles ≥ 100) | +0,004 | +0,009 | +0,030 | **Adopté** |
+
+Le réglage de production de chaque horizon est écrit dans `src/auroracast/model/config.json` ; rien n'est adopté automatiquement. Les forêts sont enregistrées compressées (environ 1 à 2 Mo) ; pour elles, la progression rejouée réentraîne chaque trimestre (40 arbres) au lieu de chaque mois, pour tenir dans la durée maximale de la tâche (900 s). À 24 h et 48 h, le rapport de modèle donne l'importance des variables à la place des coefficients.
+
 **Renouvellement quotidien** (workflow « Entraînement des modèles (quotidien) », dans le cloud) : chaque jour les trois modèles sont réévalués sur 2024 → aujourd'hui, contrôlés (ROC AUC ≥ 0,70, sinon l'ancien modèle reste en service), puis réappris sur toutes les données jusqu'à la veille et publiés dans la branche `models` (un commit par jour). Le détail est dans `rapport_modele.md`.
 
 ## Application du directeur
