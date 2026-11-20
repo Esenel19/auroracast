@@ -168,3 +168,21 @@ def test_collect_job_archives_even_on_partial_failure(tmp_path, monkeypatch):
     assert jobs.main(["collect", "--work", str(tmp_path / "work")]) == 1   # échec signalé
     assert seen["state"] == ["run_1.jsonl"]                                 # état relu
     assert (tmp_path / "store" / "raw" / "noaa" / "kp" / "kp_1.json").is_file()  # archivé quand même
+
+
+def test_tune_job_publishes_report_only(tmp_path, monkeypatch):
+    monkeypatch.setenv(jobs.LOCAL_ROOT_ENV, str(tmp_path / "store"))
+    from auroracast.model import tune as tn
+
+    def fake_tune(argv):
+        out = tmp_path / "work" / "optimisation"
+        out.mkdir(parents=True)
+        (out / "rapport_optimisation.md").write_text("# Optimisation")
+        (out / "config_proposee.json").write_text("{}")
+        return 0
+
+    monkeypatch.setattr(tn, "main", fake_tune)
+    assert jobs.main(["tune", "--work", str(tmp_path / "work")]) == 0
+    store = tmp_path / "store"
+    assert len(list((store / "rapports" / "optimisation").glob("*/config_proposee.json"))) == 1
+    assert not (store / "models").exists()          # rien n'est mis en production automatiquement

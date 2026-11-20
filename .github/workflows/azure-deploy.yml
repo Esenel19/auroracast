@@ -84,8 +84,12 @@ jobs:
         run: |
           az config set extension.use_dynamic_install=yes_without_prompt > /dev/null
           az containerapp update -n ca-auroracast-api -g "$RG" --image "$IMAGE" -o none
-          for job in collect ghcnh transform train; do
-            az containerapp job update -n "caj-auroracast-$job" -g "$RG" --image "$IMAGE" -o none
+          for job in collect ghcnh transform train tune; do
+            if az containerapp job show -n "caj-auroracast-$job" -g "$RG" -o none 2> /dev/null; then
+              az containerapp job update -n "caj-auroracast-$job" -g "$RG" --image "$IMAGE" -o none
+            else
+              echo "::warning::caj-auroracast-$job absente : relancer azure/deploiement_azure.sh pour la créer"
+            fi
           done
           url=$(az containerapp show -n ca-auroracast-api -g "$RG" --query properties.configuration.ingress.fqdn -o tsv)
           echo "Application : https://$url" >> "$GITHUB_STEP_SUMMARY"

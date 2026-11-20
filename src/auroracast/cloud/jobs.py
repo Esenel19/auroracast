@@ -7,6 +7,7 @@ elle a besoin, appelle les mêmes modules que GitHub Actions, puis renvoie ses r
     python -m auroracast.cloud.jobs ghcnh       # chaque jour : observations GHCNh -> raw
     python -m auroracast.cloud.jobs transform   # raw -> clean -> PostgreSQL -> prévisions -> site
     python -m auroracast.cloud.jobs train       # PostgreSQL -> modèles (latest + versions) + rapport
+    python -m auroracast.cloud.jobs tune        # chaque semaine : algorithmes, variables, réglages -> rapports
 
 Variables : AZURE_STORAGE_ACCOUNT (stockage), DATABASE_URL (lu dans Key Vault par
 Container Apps), AURORACAST_CONTACT (User-Agent des collectes). Sans AZURE_STORAGE_ACCOUNT,
@@ -136,7 +137,23 @@ def train(work: Path) -> bool:
     return True
 
 
-TASKS = {"collect": collect, "ghcnh": ghcnh, "transform": transform, "train": train}
+def tune(work: Path) -> bool:
+    """Optimisation : rapport et réglage proposé dans rapports/optimisation/<horodatage>/.
+
+    Rien n'est mis en production ici : le réglage proposé est adopté dans config.json après lecture.
+    """
+    from auroracast.model import tune as tn
+
+    out = work / "optimisation"
+    if not _run("optimisation", tn.main, ["--out", str(out)]):
+        return False
+    stamp = _stamp()
+    n = _s("rapports").upload(out, f"optimisation/{stamp}")
+    _log(f"rapport d'optimisation publié : rapports/optimisation/{stamp} ({n} fichiers)")
+    return True
+
+
+TASKS = {"collect": collect, "ghcnh": ghcnh, "transform": transform, "train": train, "tune": tune}
 
 
 def main(argv: list[str] | None = None) -> int:

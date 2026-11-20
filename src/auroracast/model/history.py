@@ -63,7 +63,7 @@ def backtest(df: pd.DataFrame, horizons=HORIZONS, start: str = BACKTEST_START,
             te = data[(data.index >= m) & (data.index < end)]
             if len(te) < min_rows or tr[target(h)].nunique() < 2:
                 continue
-            model = build_model().fit(tr[FEATURES], tr[target(h)])
+            model = build_model(h).fit(tr[FEATURES], tr[target(h)])
             proba = model.predict_proba(te[FEATURES])[:, 1]
             met = metrics(te[target(h)].to_numpy(), proba, thresholds.get(h, 0.5))
             rows.append({"mois": m.strftime("%Y-%m"), "horizon_h": h, "n_appris": len(tr),

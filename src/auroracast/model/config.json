@@ -1,0 +1,8 @@
+{
+  "note": "Réglage du modèle de production par horizon : variables retenues et hyperparamètres de la régression logistique. Modifié seulement après lecture du rapport d'optimisation (python -m auroracast.model.tune).",
+  "horizons": {
+    "6": {"features": ["kp", "kp_mean_24h", "kp_max_24h", "kp_max_24h_27d", "bz_mean_3h", "bz_min_6h", "bt_mean_3h", "speed_mean_6h", "density_mean_6h", "f107", "doy_sin", "doy_cos"], "C": 1.0, "penalty": "l2", "class_weight": null},
+    "24": {"features": ["kp", "kp_mean_24h", "kp_max_24h", "kp_max_24h_27d", "bz_mean_3h", "bz_min_6h", "bt_mean_3h", "speed_mean_6h", "density_mean_6h", "f107", "doy_sin", "doy_cos"], "C": 1.0, "penalty": "l2", "class_weight": null},
+    "48": {"features": ["kp", "kp_mean_24h", "kp_max_24h", "kp_max_24h_27d", "bz_mean_3h", "bz_min_6h", "bt_mean_3h", "speed_mean_6h", "density_mean_6h", "f107", "doy_sin", "doy_cos"], "C": 1.0, "penalty": "l2", "class_weight": null}
+  }
+}

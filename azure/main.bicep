@@ -328,6 +328,7 @@ var jobs = [
   { name: 'ghcnh', who: 'collecte', db: false, cron: '37 5 * * *', cpu: '0.5', memory: '1Gi' }        // observations
   { name: 'transform', who: 'transform', db: true, cron: '47 */3 * * *', cpu: '1.0', memory: '2Gi' }  // 30 min après la collecte
   { name: 'train', who: 'train', db: true, cron: '13 10 * * *', cpu: '1.0', memory: '2Gi' }           // chaque matin
+  { name: 'tune', who: 'train', db: true, cron: '43 11 * * 0', cpu: '1.0', memory: '2Gi' }            // chaque dimanche : optimisation
 ]
 
 resource caJobs 'Microsoft.App/jobs@2024-03-01' = [for j in jobs: {

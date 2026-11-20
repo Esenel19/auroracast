@@ -130,6 +130,19 @@
       "frequence": "chaque jour à 10:13 UTC (lancement manuel aussi possible)"
     },
     {
+      "nom_logique": "caj-auroracast-tune",
+      "type": "execution",
+      "service": "Container Apps Job (consommation)",
+      "role_metier": "optimisation : comparaison d'algorithmes, sélection des variables, recherche d'hyperparamètres ; rapport vers rapports (rien n'est mis en production automatiquement)",
+      "cpu": 1,
+      "memoire_gio": 2,
+      "gpu": false,
+      "duree_max_s": 900,
+      "relances": 0,
+      "declenchement": "planifie",
+      "frequence": "chaque dimanche à 11:43 UTC (lancement manuel aussi possible)"
+    },
+    {
       "nom_logique": "ca-auroracast-api",
       "type": "application",
       "service": "Container App (consommation), HTTPS seulement",

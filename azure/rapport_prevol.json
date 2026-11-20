@@ -7,7 +7,7 @@
       "id": "C1",
       "controle": "Aucune clé ni secret dans les fichiers suivis du dépôt",
       "statut": "ok",
-      "preuve": "112 fichiers analysés, 0 motif trouvé",
+      "preuve": "116 fichiers analysés, 0 motif trouvé",
       "responsable": "partagé"
     },
     {
@@ -101,6 +101,15 @@
           "duree_max_s": 900,
           "declenchement": "planifie",
           "frequence": "chaque jour à 10:13 UTC (lancement manuel aussi possible)",
+          "relances": 0
+        },
+        {
+          "nom_logique": "caj-auroracast-tune",
+          "cpu": 1,
+          "gpu": false,
+          "duree_max_s": 900,
+          "declenchement": "planifie",
+          "frequence": "chaque dimanche à 11:43 UTC (lancement manuel aussi possible)",
           "relances": 0
         }
       ],

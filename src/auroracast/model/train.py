@@ -10,6 +10,9 @@ Lit la vue ``v_training_kp`` de l'entrepôt (une ligne par tranche de 3 h, varia
 3. modèle de production : réappris sur TOUTES les tranches connues (jusqu'à la veille),
    avec le seuil choisi en 1. C'est lui qui intègre les nouvelles données chaque jour.
 
+Variables retenues et hyperparamètres : config.json (un réglage par horizon), issu de
+l'optimisation (``python -m auroracast.model.tune``) et adopté après lecture de son rapport.
+
     python -m auroracast.model.train                 # DATABASE_URL lu dans .env
     python -m auroracast.model.train --out models --horizons 6 24 48
 """
@@ -17,6 +20,7 @@ Lit la vue ``v_training_kp`` de l'entrepôt (une ligne par tranche de 3 h, varia
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import os
 from datetime import UTC, datetime
@@ -25,6 +29,7 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
+from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import average_precision_score, brier_score_loss, roc_auc_score
@@ -38,6 +43,8 @@ FEATURES = [
     "bz_mean_3h", "bz_min_6h", "bt_mean_3h", "speed_mean_6h", "density_mean_6h",
     "f107", "doy_sin", "doy_cos",
 ]
+DEFAULT_CONFIG = {"features": FEATURES, "C": 1.0, "penalty": "l2", "class_weight": None}
+CONFIG_FILE = Path(__file__).with_name("config.json")
 VALIDATION_START = pd.Timestamp("2022-01-01", tz="UTC")
 TEST_START = pd.Timestamp("2024-01-01", tz="UTC")
 
@@ -85,13 +92,51 @@ def split(df: pd.DataFrame, tgt: str) -> dict[str, pd.DataFrame]:
 
 
 # ------------------------------------------------------------------------- modèles
-def build_model() -> Pipeline:
-    """Valeurs manquantes → médiane, mise à l'échelle, régression logistique."""
+class SelectColumns(BaseEstimator, TransformerMixin):
+    """Garde les variables retenues : le modèle reçoit toujours les 12 variables (FEATURES)."""
+
+    def __init__(self, columns=None):
+        self.columns = columns
+
+    def fit(self, x, y=None):
+        return self
+
+    def transform(self, x):
+        return x[list(self.columns)]
+
+
+def model_config(horizon: int | None = None) -> dict:
+    """Réglage d'un horizon dans config.json ; à défaut, le réglage d'origine (12 variables)."""
+    cfg = dict(DEFAULT_CONFIG)
+    if horizon is not None and CONFIG_FILE.exists():
+        cfg.update(json.loads(CONFIG_FILE.read_text(encoding="utf-8")).get("horizons", {}).get(str(horizon), {}))
+    unknown = set(cfg["features"]) - set(FEATURES)
+    if unknown:
+        raise ValueError(f"variables inconnues dans config.json : {sorted(unknown)}")
+    return cfg
+
+
+def build_model(horizon: int | None = None, config: dict | None = None) -> Pipeline:
+    """Variables retenues → médiane pour les manquantes → mise à l'échelle → régression logistique."""
+    cfg = {**DEFAULT_CONFIG, **(config or model_config(horizon))}
     return Pipeline([
+        ("select", SelectColumns(list(cfg["features"]))),
         ("imputer", SimpleImputer(strategy="median")),
         ("scaler", StandardScaler()),
-        ("logit", LogisticRegression(max_iter=1000)),
+        ("logit", _logistic(cfg)),
     ])
+
+
+def _logistic(cfg: dict) -> LogisticRegression:
+    """L1 ou L2 ; scikit-learn >= 1.8 remplace « penalty » par « l1_ratio » (0 = L2, 1 = L1)."""
+    l1 = cfg["penalty"] == "l1"
+    kw = {"C": cfg["C"], "class_weight": cfg["class_weight"], "max_iter": 1000,
+          "solver": "liblinear" if l1 else "lbfgs"}
+    if inspect.signature(LogisticRegression).parameters["penalty"].default == "deprecated":
+        kw["l1_ratio"] = 1.0 if l1 else 0.0
+    else:
+        kw["penalty"] = cfg["penalty"]
+    return LogisticRegression(**kw)
 
 
 def persistence_proba(part: pd.DataFrame) -> np.ndarray:
@@ -144,7 +189,8 @@ def train(df: pd.DataFrame, horizon: int = 24) -> tuple[Pipeline, dict]:
     parts = split(df, tgt)
     tr, va = parts["train"], parts["validation"]
 
-    model = build_model().fit(tr[FEATURES], tr[tgt])
+    cfg = model_config(horizon)
+    model = build_model(config=cfg).fit(tr[FEATURES], tr[tgt])
     proba = {k: model.predict_proba(p[FEATURES])[:, 1] for k, p in parts.items()}
     threshold = best_threshold(va[tgt].to_numpy(), proba["validation"])
 
@@ -160,15 +206,16 @@ def train(df: pd.DataFrame, horizon: int = 24) -> tuple[Pipeline, dict]:
 
     logit = model.named_steps["logit"]
     results["coefficients"] = {"constante": float(logit.intercept_[0]),
-                               **{f: float(c) for f, c in zip(FEATURES, logit.coef_[0])}}
+                               **{f: float(c) for f, c in zip(cfg["features"], logit.coef_[0])}}
     results["periodes"] = {k: [p.index.min().isoformat(), p.index.max().isoformat()]
                            for k, p in parts.items()}
 
     # Modèle de production : mêmes réglages, appris sur tout ce qui est connu aujourd'hui.
     everything = known(df, tgt)
-    production = build_model().fit(everything[FEATURES], everything[tgt])
+    production = build_model(config=cfg).fit(everything[FEATURES], everything[tgt])
     results["production"] = {"n": len(everything), "jusqu_au": everything.index.max().isoformat()}
-    results["variables"] = FEATURES
+    results["variables"] = list(cfg["features"])
+    results["reglage"] = {k: cfg[k] for k in ("C", "penalty", "class_weight")}
     return production, results
 
 
