@@ -1,0 +1,7 @@
+# Exécution sur Azure : API de prédiction et accès au stockage Blob par identité gérée.
+# Installé dans l'image Docker (Container Apps) et en développement, pas par les collectes GitHub.
+-r requirements.txt
+fastapi>=0.115
+uvicorn[standard]>=0.30
+azure-identity>=1.17
+azure-storage-blob>=12.20

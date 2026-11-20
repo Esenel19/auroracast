@@ -23,6 +23,9 @@ Projet de certification **RNCP 39586** (Ingénieur en science des données), sp�
 auroracast/
 ├── src/auroracast/collect/   # collecteurs (NOAA, GFZ, OMNIWeb, GHCNh)
 ├── src/auroracast/transform/ # nettoyage : données brutes -> tables propres
+├── src/auroracast/cloud/     # stockage Blob et tâches planifiées Azure
+├── src/auroracast/api/       # API FastAPI (application + prédiction)
+├── azure/                    # TP3 : Bicep, script de déploiement, plan, prévol
 ├── dags/                     # DAGs Airflow (à venir)
 ├── tests/                    # tests pytest
 ├── notebooks/                # analyses exploratoires
@@ -80,8 +83,8 @@ marquée en échec et GitHub t'envoie un e-mail.
 Pour récupérer les données sur ton PC : `git fetch origin raw-data` puis
 `git worktree add ../auroracast-data raw-data`.
 
-**Passage à Azure plus tard** : ajouter le secret `AZURE_STORAGE_CONNECTION_STRING` ; les
-fichiers partiront aussi dans Azure Blob Storage (conteneur `raw`), sans autre changement.
+**Sur Azure** : la même collecte tourne aussi dans un Container Apps Job et archive dans un
+stockage Blob privé, accédé par identité gérée, sans clé (voir [docs/azure.md](docs/azure.md)).
 
 **Fiabilité** : l'ordonnanceur de GitHub peut retarder ou supprimer des passages (incident
 INC-003 : 2 passages en 13 h la première nuit). La collecte est donc prévue pour se rattraper :
@@ -263,6 +266,21 @@ Sur le PC (Docker Desktop démarré, fichier `.env` rempli d'après `.env.exampl
 docker compose up -d                          # base PostgreSQL 16 locale
 python -m auroracast.warehouse.load           # lit DATABASE_URL dans .env
 docker exec -it auroracast-db psql -U auroracast -d auroracast   # console SQL
+```
+
+## Déploiement sur Azure
+
+Toute la chaîne (collecte, transformation, entrepôt, entraînement) et une **API FastAPI**
+(application du directeur + `POST /api/predict`) tournent sur Azure for Students : Container Apps
+Jobs planifiés, stockage Blob privé, Key Vault, identité gérée, OIDC depuis GitHub, Log Analytics,
+alertes. Infrastructure décrite en Bicep (`azure/main.bicep`), déployée par
+`azure/deploiement_azure.sh` depuis Azure Cloud Shell (simulation par défaut), image construite et testée par
+`.github/workflows/azure-deploy.yml`. Coût estimé : 1 à 2 € par mois. Prévol : `python azure/preflight_tp3.py . azure/plan_tp3.json azure/deploiement_azure.sh azure/rapport_prevol.json`. Détails, garde-fous du TP3
+et preuves à fournir : [docs/azure.md](docs/azure.md).
+
+```powershell
+pip install -r requirements-azure.txt
+uvicorn auroracast.api.main:app --port 8000      # http://localhost:8000 et /api/docs
 ```
 
 ## Respect des sites (robots.txt)

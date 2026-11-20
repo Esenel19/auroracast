@@ -1,0 +1,271 @@
+{
+  "date": "2026-11-20",
+  "outil": "preflight_tp3.py (simulation locale, aucun appel Azure)",
+  "depot": "github.com/Esenel19/auroracast",
+  "controles_locaux": [
+    {
+      "id": "C1",
+      "controle": "Aucune clé ni secret dans les fichiers suivis du dépôt",
+      "statut": "ok",
+      "preuve": "110 fichiers analysés, 0 motif trouvé",
+      "responsable": "partagé"
+    },
+    {
+      "id": "C2",
+      "controle": "Le fichier .env est exclu de Git",
+      "statut": "ok",
+      "preuve": ".gitignore contient '.env'",
+      "responsable": "partagé"
+    },
+    {
+      "id": "C3",
+      "controle": "Les workflows lisent les secrets par référence (${{ secrets.X }})",
+      "statut": "ok",
+      "preuve": [
+        "azure-deploy.yml",
+        "backfill.yml",
+        "ci.yml",
+        "collect-ghcnh.yml",
+        "collect-noaa.yml",
+        "ghcnh-stations.yml",
+        "train-model.yml",
+        "transform.yml"
+      ],
+      "responsable": "partagé"
+    },
+    {
+      "id": "C4",
+      "controle": "Durée maximale fixée sur les jobs (coût et blocage bornés)",
+      "statut": "ok",
+      "preuve": "timeout-minutes présent",
+      "responsable": "partagé"
+    },
+    {
+      "id": "C5",
+      "controle": "Stockage privé : accès public désactivé, TLS 1.2, pas de clé partagée",
+      "statut": "ok",
+      "preuve": {
+        "nom_logique": "staurora<6 caractères de l'abonnement>",
+        "type": "stockage",
+        "sku": "Standard_LRS",
+        "acces_public_blob": false,
+        "tls_min": "TLS1_2",
+        "acces_par_cle_partagee": false,
+        "conteneurs": [
+          "raw",
+          "clean",
+          "models",
+          "site",
+          "rapports"
+        ],
+        "suppression_annulable_jours": 7
+      },
+      "responsable": "B4"
+    },
+    {
+      "id": "C6",
+      "controle": "Calcul CPU seul, 900 s au plus, sans relance, déclenchement maîtrisé (manuel ou planifié)",
+      "statut": "ok",
+      "preuve": [
+        {
+          "nom_logique": "caj-auroracast-collect",
+          "cpu": 0.5,
+          "gpu": false,
+          "duree_max_s": 900,
+          "declenchement": "planifie",
+          "frequence": "toutes les 3 h (17 */3 * * *)",
+          "relances": 0
+        },
+        {
+          "nom_logique": "caj-auroracast-ghcnh",
+          "cpu": 0.5,
+          "gpu": false,
+          "duree_max_s": 900,
+          "declenchement": "planifie",
+          "frequence": "chaque jour à 05:37 UTC",
+          "relances": 0
+        },
+        {
+          "nom_logique": "caj-auroracast-transform",
+          "cpu": 1,
+          "gpu": false,
+          "duree_max_s": 900,
+          "declenchement": "planifie",
+          "frequence": "toutes les 3 h, 30 min après la collecte (47 */3 * * *)",
+          "relances": 0
+        },
+        {
+          "nom_logique": "caj-auroracast-train",
+          "cpu": 1,
+          "gpu": false,
+          "duree_max_s": 900,
+          "declenchement": "planifie",
+          "frequence": "chaque jour à 10:13 UTC (lancement manuel aussi possible)",
+          "relances": 0
+        }
+      ],
+      "responsable": "B5"
+    },
+    {
+      "id": "C7",
+      "controle": "Une identité par usage, rôles précis, portée limitée (ni Owner ni Contributor, jamais l'abonnement)",
+      "statut": "ok",
+      "preuve": [
+        {
+          "nom_logique": "id-auroracast-collecte",
+          "role": "Storage Blob Data Contributor",
+          "portee": "conteneur raw du stockage"
+        },
+        {
+          "nom_logique": "id-auroracast-transform",
+          "role": "Storage Blob Data Reader (raw, models) + Storage Blob Data Contributor (clean, site, rapports)",
+          "portee": "conteneurs du stockage, un par un"
+        },
+        {
+          "nom_logique": "id-auroracast-train",
+          "role": "Storage Blob Data Contributor",
+          "portee": "conteneurs models et rapports du stockage"
+        },
+        {
+          "nom_logique": "id-auroracast-api",
+          "role": "Storage Blob Data Reader",
+          "portee": "conteneurs site et models du stockage"
+        },
+        {
+          "nom_logique": "id-auroracast-github",
+          "role": "Container Apps Contributor",
+          "portee": "groupe de ressources rg-auroracast-tp3 (changer l'image des apps ; aucun accès aux données ni aux secrets)"
+        }
+      ],
+      "responsable": "partagé"
+    },
+    {
+      "id": "C8",
+      "controle": "Journaux : rétention et plafond quotidien fixés",
+      "statut": "ok",
+      "preuve": {
+        "nom_logique": "log-auroracast",
+        "type": "journaux",
+        "service": "Log Analytics",
+        "retention_jours": 30,
+        "plafond_quotidien_go": 0.1,
+        "alertes": [
+          "tâche terminée en échec (vérifiée toutes les heures)",
+          "aucune transformation réussie depuis 12 h"
+        ]
+      },
+      "responsable": "partagé"
+    },
+    {
+      "id": "C9",
+      "controle": "Suivi des coûts (budget, ou relevé du crédit si l'offre n'a pas de budget), sans le confondre avec un arrêt automatique",
+      "statut": "ok",
+      "preuve": {
+        "disponible": false,
+        "raison": "Cost Management ne prend pas en charge l'offre Azure for Students",
+        "remplacement": "relevé mensuel du crédit (P2) + plafonds techniques (900 s par tâche, aucune relance, API à l'échelle zéro, journaux 0,1 Go/jour) + alertes e-mail sur échec",
+        "arret_automatique": false,
+        "note": "un budget Azure alerte seulement ; il n'arrête aucune ressource. Le modèle Bicep sait en créer un (deployBudget=true) si l'offre change"
+      },
+      "responsable": "partagé"
+    },
+    {
+      "id": "C10",
+      "controle": "Date de fin étiquetée, procédure de suppression écrite et testée",
+      "statut": "ok",
+      "preuve": {
+        "expire-le": "2027-11-20",
+        "test": "rg-auroracast-test créé puis supprimé"
+      },
+      "responsable": "partagé"
+    },
+    {
+      "id": "C11",
+      "controle": "Offre sans carte et sans passage au payant",
+      "statut": "ok",
+      "preuve": {
+        "offre": "Azure for Students (MS-AZR-0170P)",
+        "carte_bancaire": false,
+        "comportement_fin_credit": "abonnement désactivé (pas de facturation sans passage manuel au paiement à l'usage)"
+      },
+      "responsable": "partagé"
+    },
+    {
+      "id": "C12",
+      "controle": "Région, service et limites documentés",
+      "statut": "ok",
+      "preuve": {
+        "region": "francecentral",
+        "justification": "proche des utilisateurs ; données publiques sans donnée personnelle ; à confirmer dans la politique de régions autorisées de l'abonnement étudiant"
+      },
+      "responsable": "partagé"
+    },
+    {
+      "id": "C13",
+      "controle": "Script de déploiement : simulation par défaut, confirmation explicite, aucun secret écrit ni affiché",
+      "statut": "ok",
+      "preuve": "simulation par défaut ; confirmation OUI avant création ; secret saisi sans écho",
+      "responsable": "partagé"
+    },
+    {
+      "id": "C14",
+      "controle": "Le modèle Bicep applique le plan (conteneurs, stockage privé, journaux, 900 s, rôles, HTTPS)",
+      "statut": "ok",
+      "preuve": {
+        "conteneurs_identiques_au_plan": true,
+        "acces_public_blob_desactive": true,
+        "cle_partagee_desactivee": true,
+        "tls_1_2": true,
+        "journaux_30_j_0_1_go": true,
+        "taches_900_s_au_plus": true,
+        "aucune_relance_automatique": true,
+        "aucun_role_large": true,
+        "ingress_https_seulement": true,
+        "federation_github_branche_main": true
+      },
+      "responsable": "partagé"
+    }
+  ],
+  "controles_locaux_ok": "14/14",
+  "a_verifier_console": [
+    {
+      "id": "P1",
+      "a_prouver": "Abonnement « Azure for Students » actif, sans moyen de paiement",
+      "preuve_attendue": "capture Abonnements (nom de l'offre, état), identifiant masqué",
+      "fournie": false
+    },
+    {
+      "id": "P2",
+      "a_prouver": "Crédit restant et date d'expiration",
+      "preuve_attendue": "capture du solde de crédit (Microsoft Azure Sponsorships / portail), chaque mois",
+      "fournie": false
+    },
+    {
+      "id": "P3",
+      "a_prouver": "Régions autorisées par la politique de l'abonnement (francecentral)",
+      "preuve_attendue": "capture Policy > Allowed locations (aussi listée par le script, étape 0b)",
+      "fournie": false
+    },
+    {
+      "id": "P4",
+      "a_prouver": "Suivi des coûts : budget indisponible pour l'offre, relevé du crédit à la place",
+      "preuve_attendue": "capture du message « offre non prise en charge » de Cost Management + relevé P2 mensuel",
+      "fournie": false
+    },
+    {
+      "id": "P5",
+      "a_prouver": "Ressources réellement créées et privées",
+      "preuve_attendue": "az resource list -g rg-auroracast-tp3 ; allowBlobPublicAccess=false, allowSharedKeyAccess=false",
+      "fournie": false
+    },
+    {
+      "id": "P6",
+      "a_prouver": "Suppression effective (testée sur rg-auroracast-test, puis en fin de projet)",
+      "preuve_attendue": "az group show -n rg-auroracast-test → ResourceGroupNotFound",
+      "fournie": false
+    }
+  ],
+  "decision": "NO-GO cloud réel ; démonstration locale",
+  "ecarts_locaux": [],
+  "justification": "14 contrôles locaux sur 14 au vert ; preuves fournisseur : 0/6. Condition incertaine = NO-GO pour le cloud réel ; la démonstration reste locale."
+}

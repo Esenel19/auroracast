@@ -1,0 +1,173 @@
+{
+  "projet": "AuroraCast",
+  "tp": "TP3 - chaîne AuroraCast complète sur Azure, à coût quasi nul",
+  "fournisseur": "Microsoft Azure",
+  "offre": "Azure for Students (MS-AZR-0170P)",
+  "carte_bancaire": false,
+  "credit_usd": 100,
+  "duree_mois": 12,
+  "comportement_fin_credit": "abonnement désactivé (pas de facturation sans passage manuel au paiement à l'usage)",
+  "passage_payant_autorise": false,
+  "cout_estime_par_mois_usd": "1 à 2 (calcul dans la gratuité mensuelle de Container Apps ; stockage, Key Vault et alertes de journaux)",
+  "region": "francecentral",
+  "region_justification": "proche des utilisateurs ; données publiques sans donnée personnelle ; à confirmer dans la politique de régions autorisées de l'abonnement étudiant",
+  "groupe_ressources": "rg-auroracast-tp3",
+  "tags": {
+    "projet": "auroracast",
+    "tp": "tp3",
+    "proprietaire": "elodie",
+    "expire-le": "2027-11-20"
+  },
+  "suppression_prevue": "fin du crédit (2027-11-20, à confirmer par P2) ; procédure testée sur rg-auroracast-test",
+  "budget": {
+    "disponible": false,
+    "raison": "Cost Management ne prend pas en charge l'offre Azure for Students",
+    "remplacement": "relevé mensuel du crédit (P2) + plafonds techniques (900 s par tâche, aucune relance, API à l'échelle zéro, journaux 0,1 Go/jour) + alertes e-mail sur échec",
+    "arret_automatique": false,
+    "note": "un budget Azure alerte seulement ; il n'arrête aucune ressource. Le modèle Bicep sait en créer un (deployBudget=true) si l'offre change"
+  },
+  "ressources": [
+    {
+      "nom_logique": "id-auroracast-collecte",
+      "type": "identite_geree",
+      "role": "Storage Blob Data Contributor",
+      "portee": "conteneur raw du stockage"
+    },
+    {
+      "nom_logique": "id-auroracast-transform",
+      "type": "identite_geree",
+      "role": "Storage Blob Data Reader (raw, models) + Storage Blob Data Contributor (clean, site, rapports)",
+      "portee": "conteneurs du stockage, un par un",
+      "role_secrets": "Key Vault Secrets User sur le Key Vault"
+    },
+    {
+      "nom_logique": "id-auroracast-train",
+      "type": "identite_geree",
+      "role": "Storage Blob Data Contributor",
+      "portee": "conteneurs models et rapports du stockage",
+      "role_secrets": "Key Vault Secrets User sur le Key Vault"
+    },
+    {
+      "nom_logique": "id-auroracast-api",
+      "type": "identite_geree",
+      "role": "Storage Blob Data Reader",
+      "portee": "conteneurs site et models du stockage"
+    },
+    {
+      "nom_logique": "id-auroracast-github",
+      "type": "identite_geree_github",
+      "role": "Container Apps Contributor",
+      "portee": "groupe de ressources rg-auroracast-tp3 (changer l'image des apps ; aucun accès aux données ni aux secrets)",
+      "federation": "repo:Esenel19/auroracast:ref:refs/heads/main"
+    },
+    {
+      "nom_logique": "staurora<6 caractères de l'abonnement>",
+      "type": "stockage",
+      "sku": "Standard_LRS",
+      "acces_public_blob": false,
+      "tls_min": "TLS1_2",
+      "acces_par_cle_partagee": false,
+      "conteneurs": [
+        "raw",
+        "clean",
+        "models",
+        "site",
+        "rapports"
+      ],
+      "suppression_annulable_jours": 7
+    },
+    {
+      "nom_logique": "caj-auroracast-collect",
+      "type": "execution",
+      "service": "Container Apps Job (consommation)",
+      "role_metier": "collecte NOAA SWPC et MET Norway vers raw",
+      "cpu": 0.5,
+      "memoire_gio": 1,
+      "gpu": false,
+      "duree_max_s": 900,
+      "relances": 0,
+      "declenchement": "planifie",
+      "frequence": "toutes les 3 h (17 */3 * * *)"
+    },
+    {
+      "nom_logique": "caj-auroracast-ghcnh",
+      "type": "execution",
+      "service": "Container Apps Job (consommation)",
+      "role_metier": "observations météo GHCNh vers raw",
+      "cpu": 0.5,
+      "memoire_gio": 1,
+      "gpu": false,
+      "duree_max_s": 900,
+      "relances": 0,
+      "declenchement": "planifie",
+      "frequence": "chaque jour à 05:37 UTC"
+    },
+    {
+      "nom_logique": "caj-auroracast-transform",
+      "type": "execution",
+      "service": "Container Apps Job (consommation)",
+      "role_metier": "raw vers clean, chargement PostgreSQL, prévisions des 48 h et suivi vers site",
+      "cpu": 1,
+      "memoire_gio": 2,
+      "gpu": false,
+      "duree_max_s": 900,
+      "relances": 0,
+      "declenchement": "planifie",
+      "frequence": "toutes les 3 h, 30 min après la collecte (47 */3 * * *)"
+    },
+    {
+      "nom_logique": "caj-auroracast-train",
+      "type": "execution",
+      "service": "Container Apps Job (consommation)",
+      "role_metier": "entraînement, contrôle qualité (ROC AUC >= 0,70), modèles vers models",
+      "cpu": 1,
+      "memoire_gio": 2,
+      "gpu": false,
+      "duree_max_s": 900,
+      "relances": 0,
+      "declenchement": "planifie",
+      "frequence": "chaque jour à 10:13 UTC (lancement manuel aussi possible)"
+    },
+    {
+      "nom_logique": "ca-auroracast-api",
+      "type": "application",
+      "service": "Container App (consommation), HTTPS seulement",
+      "role_metier": "API FastAPI : application du directeur, /api/predict, /api/models, /api/health",
+      "cpu": 0.25,
+      "memoire_gio": 0.5,
+      "repliques": "0 à 1 (aucun coût sans requête)"
+    },
+    {
+      "nom_logique": "log-auroracast",
+      "type": "journaux",
+      "service": "Log Analytics",
+      "retention_jours": 30,
+      "plafond_quotidien_go": 0.1,
+      "alertes": [
+        "tâche terminée en échec (vérifiée toutes les heures)",
+        "aucune transformation réussie depuis 12 h"
+      ]
+    },
+    {
+      "nom_logique": "kv-aurora-<6 caractères de l'abonnement>",
+      "type": "secrets",
+      "service": "Key Vault standard",
+      "autorisation": "RBAC",
+      "secrets": [
+        "database-url"
+      ]
+    }
+  ],
+  "image": "ghcr.io/esenel19/auroracast (GitHub Container Registry, gratuit ; construite et testée par le workflow « Déploiement Azure »)",
+  "acces_github": "fédération OIDC (aucun secret Azure stocké dans GitHub)",
+  "base_de_donnees": "Neon (adresse dans Key Vault) ; PostgreSQL Flexible Server B1ms en option (DEPLOY_POSTGRES=1) si la gratuité 750 h est confirmée",
+  "donnees_envoyees": {
+    "raw": "historique brut complet (243 Mo, 905 fichiers) une fois, puis chaque collecte",
+    "clean": "tables propres (Parquet), remplacées à chaque transformation",
+    "models": "latest/ et versions datées",
+    "site": "forecast.json et suivi_modeles.json lus par l'API",
+    "rapports": "rapport de qualité des données et rapport du modèle, datés"
+  },
+  "infrastructure_as_code": "azure/main.bicep",
+  "script_deploiement": "azure/deploiement_azure.sh (dépôt GitHub)"
+}

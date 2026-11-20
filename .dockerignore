@@ -1,0 +1,22 @@
+# Seuls src/, sql/, web/, pyproject.toml et les requirements entrent dans l'image
+.git
+.github
+.venv
+venv
+.env
+.env.*
+!.env.example
+data
+models
+notebooks
+docs
+tests
+azure
+scripts
+site
+mlruns
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+*.egg-info

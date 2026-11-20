@@ -3,8 +3,8 @@ name: Collecte NOAA et MET Norway (toutes les 3 h)
 # Collecte automatique toutes les 3 heures, sans PC allumé.
 # Stockage provisoire et gratuit : les fichiers bruts sont commités dans la
 # branche « raw-data » du dépôt (le code reste seul sur « main »).
-# Plus tard : ajouter le secret AZURE_STORAGE_CONNECTION_STRING et les fichiers
-# partiront aussi dans Azure Blob Storage, sans autre changement.
+# Sur Azure, la même collecte tourne aussi dans un Container Apps Job
+# (caj-auroracast-collect, auroracast.cloud.jobs) et archive dans le stockage Blob privé.
 # Variable conseillée (Settings > Secrets and variables > Actions > Variables) :
 #   AURORACAST_CONTACT = adresse de contact envoyée dans le User-Agent
 
@@ -28,8 +28,6 @@ jobs:
   collect:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -64,12 +62,6 @@ jobs:
       - name: Archiver dans la branche raw-data
         if: always()
         run: scripts/archive_to_branch.sh raw raw-data
-
-      - name: Déposer aussi dans Azure Blob Storage (si configuré)
-        if: always() && env.AZURE_STORAGE_CONNECTION_STRING != ''
-        run: |
-          az storage container create --name raw --only-show-errors > /dev/null
-          az storage blob upload-batch --destination raw --source raw --only-show-errors
 
       - name: Signaler un échec partiel
         if: steps.collect.outcome == 'failure' || steps.metno.outcome == 'failure'

@@ -8,6 +8,7 @@ on:
 jobs:
   tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 15       # garde-fou C4 (TP3) : pas de job sans durée maximale
     services:
       postgres:            # vraie base PostgreSQL pour le test d'intégration de l'entrepôt
         image: postgres:16
@@ -27,6 +28,10 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements-dev.txt
       - run: ruff check .
+      - name: Vérifier le modèle d'infrastructure Azure (Bicep)
+        run: az bicep build --file azure/main.bicep --stdout > /dev/null
+      - name: Prévol TP3 (garde-fous de sécurité et de coût, sans appel Azure)
+        run: python azure/preflight_tp3.py . azure/plan_tp3.json azure/deploiement_azure.sh "$RUNNER_TEMP/rapport_prevol.json"
       - name: Refuser les marques de conflit Git oubliées
         run: |
           if git grep -nE '^(<<<<<<< |>>>>>>> |=======$)' -- ':!*.ipynb'; then

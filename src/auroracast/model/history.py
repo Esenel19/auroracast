@@ -77,6 +77,15 @@ def _git(repo: Path, *args: str, binary: bool = False):
     return out.stdout if binary else out.stdout.decode()
 
 
+def _version_row(sha: str, date: str, h: int, m: dict) -> dict:
+    t = m["modele"]["test"]
+    return {"sha": sha, "date": m.get("entraine_le", date), "horizon_h": h,
+            "seuil": m["seuil_alerte"], "n_appris": m.get("production", {}).get("n"),
+            "jusqu_au": m.get("production", {}).get("jusqu_au"),
+            "roc_auc_test": t["roc_auc"], "brier_test": t["brier"],
+            "precision_test": t["precision"], "rappel_test": t["rappel"]}
+
+
 def versions(repo: Path, ref: str, horizons=HORIZONS) -> list[dict]:
     """Une entrée par commit de la branche models et par horizon, du plus ancien au plus récent."""
     out = []
@@ -87,13 +96,22 @@ def versions(repo: Path, ref: str, horizons=HORIZONS) -> list[dict]:
                 m = json.loads(_git(repo, "show", f"{sha}:metrics_{h}h.json"))
             except subprocess.CalledProcessError:
                 continue
-            t = m["modele"]["test"]
-            out.append({"sha": sha[:7], "date": m.get("entraine_le", date), "horizon_h": h,
-                        "seuil": m["seuil_alerte"], "n_appris": m.get("production", {}).get("n"),
-                        "jusqu_au": m.get("production", {}).get("jusqu_au"),
-                        "roc_auc_test": t["roc_auc"], "brier_test": t["brier"],
-                        "precision_test": t["precision"], "rappel_test": t["rappel"]})
+            out.append(_version_row(sha[:7], date, h, m))
     return out
+
+
+def versions_from_dir(root: Path, horizons=HORIZONS) -> list[dict]:
+    """Même chose depuis un dossier ``<horodatage>/metrics_<h>h.json`` (stockage Azure).
+
+    L'identifiant de version est le nom du sous-dossier (ex. 20261120T1013Z).
+    """
+    out = []
+    for d in sorted(p for p in Path(root).iterdir() if p.is_dir()):
+        for h in horizons:
+            f = d / f"metrics_{h}h.json"
+            if f.is_file():
+                out.append(_version_row(d.name, d.name, h, json.loads(f.read_text(encoding="utf-8"))))
+    return sorted(out, key=lambda v: (v["date"], v["horizon_h"]))
 
 
 def load_bundle(repo: Path, sha: str, h: int) -> dict:
@@ -151,6 +169,7 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("suivi", help="assemble suivi_modeles.json pour la page web")
     s.add_argument("--repo", default=".")
     s.add_argument("--ref", default="origin/models")
+    s.add_argument("--versions-dir", help="versions dans un dossier (Azure) au lieu de la branche git")
     s.add_argument("--models", default="models", help="dossier contenant backtest.json")
     s.add_argument("--out", default="site")
     s.add_argument("--database-url")
@@ -165,15 +184,23 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Backtest : {len(rows)} mois × horizon")
         return 0
 
-    repo = Path(args.repo)
-    vers = versions(repo, args.ref)
     cache: dict = {}
+    if args.versions_dir:
+        vdir = Path(args.versions_dir)
+        vers = versions_from_dir(vdir)
 
-    def loader(sha, h):
-        full = next(v["sha"] for v in vers if v["sha"] == sha)
-        if (full, h) not in cache:
-            cache[(full, h)] = load_bundle(repo, _git(repo, "rev-parse", full).strip(), h)
-        return cache[(full, h)]
+        def loader(sha, h):
+            if (sha, h) not in cache:
+                cache[(sha, h)] = joblib.load(vdir / sha / model_file(h))
+            return cache[(sha, h)]
+    else:
+        repo = Path(args.repo)
+        vers = versions(repo, args.ref)
+
+        def loader(sha, h):
+            if (sha, h) not in cache:
+                cache[(sha, h)] = load_bundle(repo, _git(repo, "rev-parse", sha).strip(), h)
+            return cache[(sha, h)]
 
     bt_file = Path(args.models) / "backtest.json"
     data = {"genere_utc": datetime.now(UTC).isoformat(timespec="minutes").replace("+00:00", "Z"),
