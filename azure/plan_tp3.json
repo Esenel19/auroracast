@@ -4,7 +4,8 @@
   "fournisseur": "Microsoft Azure",
   "offre": "Azure for Students (MS-AZR-0170P)",
   "carte_bancaire": false,
-  "credit_usd": 100,
+  "credit_usd": 90,
+  "credit_constate": "90 $US disponibles sur 90, expiration le 30/10/2027 (portail, relevé du 20/11/2026, preuve P2)",
   "duree_mois": 12,
   "comportement_fin_credit": "abonnement désactivé (pas de facturation sans passage manuel au paiement à l'usage)",
   "passage_payant_autorise": false,
@@ -16,9 +17,9 @@
     "projet": "auroracast",
     "tp": "tp3",
     "proprietaire": "elodie",
-    "expire-le": "2027-11-20"
+    "expire-le": "2027-10-30"
   },
-  "suppression_prevue": "fin du crédit (2027-11-20, à confirmer par P2) ; procédure testée sur rg-auroracast-test",
+  "suppression_prevue": "fin du crédit (2027-10-30, relevée par P2) ; procédure testée sur rg-auroracast-test",
   "budget": {
     "disponible": false,
     "raison": "Cost Management ne prend pas en charge l'offre Azure for Students",

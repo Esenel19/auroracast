@@ -24,7 +24,7 @@ DRY_RUN="${DRY_RUN:-1}"
 LOC="${LOC:-francecentral}"
 RG="${RG:-rg-auroracast-tp3}"
 GITHUB_REPO=Esenel19/auroracast
-EXPIRE_LE="${EXPIRE_LE:-2027-11-20}"      # fin du crédit Azure for Students (12 mois) : à ajuster (P2)
+EXPIRE_LE="${EXPIRE_LE:-2027-10-30}"      # fin du crédit Azure for Students, relevée sur le portail (P2)
 DEPLOY_POSTGRES="${DEPLOY_POSTGRES:-0}"  # 1 = PostgreSQL Azure B1ms, seulement si les 750 h gratuites sont confirmées
 HERE="$(cd "$(dirname "$0")" && pwd)"
 TEMPLATE="$HERE/main.bicep"

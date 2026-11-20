@@ -101,7 +101,7 @@ python azure/preflight_tp3.py . azure/plan_tp3.json azure/deploiement_azure.sh a
 | C7 | Une identité par usage, rôles précis | Voir le tableau des droits |
 | C8 | Journaux bornés | Log Analytics : 30 jours, 0,1 Go par jour |
 | C9 | Suivi des coûts | Budget indisponible pour Azure for Students : relevé mensuel du crédit, plafonds techniques, alertes |
-| C10 | Suppression écrite et testée | Étiquette `expire-le=2027-11-20` ; test sur `rg-auroracast-test` ; `--supprimer` |
+| C10 | Suppression écrite et testée | Étiquette `expire-le=2027-10-30` (fin du crédit) ; test sur `rg-auroracast-test` ; `--supprimer` |
 | C11 | Pas de passage au payant | Offre sans carte bancaire |
 | C12 | Région et limites documentées | `azure/plan_tp3.json` |
 | C13 | Script sans risque | Simulation par défaut, confirmation « OUI », secret saisi sans écho |
@@ -122,7 +122,7 @@ gratuité mensuelle de Container Apps.
 | Key Vault | quelques milliers de lectures | < 0,10 |
 | Log Analytics | ≤ 3 Go | 0 à 1 |
 | 2 alertes de journaux | évaluation toutes les 1 h et 3 h | ≈ 1 |
-| **Total** | | **≈ 1 à 2, soit 12 à 24 sur 12 mois pour un crédit de 100** |
+| **Total** | | **≈ 1 à 2, soit 11 à 22 jusqu'au 30/10/2027, pour un crédit de 90** |
 
 À éviter, car ces services feraient fondre le crédit :
 - **Azure Container Registry** (~5 par mois), remplacé par ghcr.io ;

@@ -7,7 +7,7 @@
       "id": "C1",
       "controle": "Aucune clé ni secret dans les fichiers suivis du dépôt",
       "statut": "ok",
-      "preuve": "111 fichiers analysés, 0 motif trouvé",
+      "preuve": "112 fichiers analysés, 0 motif trouvé",
       "responsable": "partagé"
     },
     {
@@ -174,7 +174,7 @@
       "controle": "Date de fin étiquetée, procédure de suppression écrite et testée",
       "statut": "ok",
       "preuve": {
-        "expire-le": "2027-11-20",
+        "expire-le": "2027-10-30",
         "test": "rg-auroracast-test créé puis supprimé"
       },
       "responsable": "partagé"

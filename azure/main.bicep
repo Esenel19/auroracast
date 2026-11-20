@@ -21,7 +21,7 @@ targetScope = 'resourceGroup'
 param location string = resourceGroup().location
 
 @description('Fin prévue (fin du crédit Azure for Students), écrite en étiquette sur chaque ressource')
-param expireLe string = '2027-11-20'
+param expireLe string = '2027-10-30'
 
 @description('Propriétaire, écrit en étiquette')
 param proprietaire string = 'elodie'
