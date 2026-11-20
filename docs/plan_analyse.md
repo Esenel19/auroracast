@@ -35,6 +35,7 @@ géomagnétique, ciel noir et ciel dégagé. On mesure donc la fréquence de leu
 | Belle aurore | Kp ≥ 4 sur la tranche de 3 h | `fact_kp` (GFZ, NOAA) |
 | **Heure favorable** | heure noire **et** dégagée **et** Kp ≥ 4 | vue `v_aurora_conditions` |
 | **Nuit favorable** | nuit (midi à midi UTC) avec au moins une heure favorable | idem |
+| **Heures favorables estimées** | heures favorables observées / couverture du ciel (voir la limite ci-dessous) | idem |
 | Part de Kp ≥ 4 | heures noires avec Kp ≥ 4 / heures noires au Kp connu | idem |
 | Part de ciel dégagé | heures noires dégagées / heures noires au ciel observé | idem |
 | Couverture du ciel | heures noires au ciel observé / heures noires (qualité de la mesure) | idem |
@@ -51,9 +52,16 @@ observations de nuages commencent en 2010) ; 1932 → année précédente pour l
 Les valeurs sont des **moyennes par an** : « 6,1 nuits favorables en janvier à Kiruna »
 veut dire 6,1 nuits par an en moyenne sur les années observées.
 
-Limite connue : une heure sans observation de nuages ne peut pas être favorable. Les nuits
-favorables sont donc un minimum ; la colonne « ciel observé » permet de comparer les lieux à
-qualité de mesure égale.
+Limite connue, découverte sur les données réelles : une heure sans observation de nuages ne peut
+pas être comptée favorable, et les stations n'observent pas toutes autant. La station de Tromsø
+relève les nuages pour **32 %** des heures noires seulement, contre 83 à 91 % à Kiruna et
+Rovaniemi. Comptées telles quelles, les heures et nuits favorables placent Tromsø dernière
+(11 nuits par saison contre 20 à Kiruna) : c'est un artefact de mesure. La carte compare donc les
+lieux avec les **heures favorables estimées** (heures observées divisées par la part d'heures
+observées), en supposant que les heures manquantes ressemblent aux autres : les trous suivent
+l'horaire de relevé de la station, pas la météo. Sous 20 % d'heures observées, l'estimation n'est
+pas affichée. Résultat sur une saison (septembre à mars) : Kiruna environ 67 h favorables par an,
+Tromsø 53 h, Rovaniemi 45 h. Les nuits observées restent dans le tableau, comme minimum.
 
 ## 3. Requêtes et tableau de bord (C2.1.3)
 
@@ -90,7 +98,7 @@ fréquences, V de Cramér) et sur Kruskal-Wallis, calculé au jour.
 
 | Question | Graphique | Choix |
 | --- | --- | --- |
-| Meilleurs mois et lieux | carte de chaleur mois × lieu des nuits favorables | une seule teinte (bleu) du clair au foncé ; valeur écrite dans chaque case (la couleur n'est jamais seule) ; case grise et tiret pour l'absence de nuit noire |
+| Meilleurs mois et lieux | carte de chaleur mois × lieu des heures favorables estimées | une seule teinte (bleu) du clair au foncé ; valeur écrite dans chaque case (la couleur n'est jamais seule) ; case grise et tiret pour l'absence de nuit noire |
 | Saisons de l'activité | courbe mensuelle de Kp ≥ 4 depuis 1932, intervalle à 95 %, colonnes des équinoxes | une série, pas de légende ; l'incertitude est montrée |
 | Ciel selon le lieu | 3 courbes mensuelles | 3 couleurs d'une palette validée pour les daltonismes (script de contrôle : écarts ΔE ≥ 9 en mode clair et sombre), légende **et** étiquette en bout de courbe |
 | Cycle solaire | courbe annuelle depuis 1932 et moyenne en pointillé | un seul axe |
@@ -104,8 +112,8 @@ revalidées sur le fond sombre) ; lisible sur téléphone (défilement horizonta
 
 Calculées sur les données à chaque mise à jour, et affichées en bas de la page :
 
-1. les trois meilleures combinaisons lieu × mois (nuits favorables par an) ;
-2. le lieu qui offre le plus de nuits favorables sur une saison (septembre à mars) ;
+1. les trois meilleures combinaisons lieu × mois (heures favorables estimées par an) ;
+2. le lieu qui offre le plus d'heures favorables sur une saison (septembre à mars) ;
 3. les mois à ne pas programmer (pas de nuit noire) ;
-4. la phase du cycle solaire (années récentes au-dessus de la moyenne : maximum solaire) ;
+4. la phase du cycle solaire (dernière année complète comparée à la moyenne depuis 1932) ;
 5. la durée de séjour : le ciel décide plus que le Soleil, prévoir 3 à 4 nuits au moins.

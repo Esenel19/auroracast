@@ -74,17 +74,31 @@ def wilson(k: int, n: int, z: float = 1.96) -> tuple[float | None, float | None]
     return max(0.0, c - h), min(1.0, c + h)
 
 
+MIN_COVERAGE = 0.2                     # en dessous, l'estimation corrigée serait trop fragile
+
+
 def month_location(rows: list[dict]) -> list[dict]:
+    """Indicateurs par lieu et par mois.
+
+    Une heure sans observation de nuages ne peut pas être comptée favorable : les heures et nuits
+    favorables observées sont des minimums, d'autant plus bas que la station observe peu (Tromsø :
+    environ un tiers des heures). L'estimation corrigée divise les heures favorables par la part
+    d'heures noires observées, en supposant que les heures manquantes ressemblent aux autres
+    (les trous suivent l'horaire de la station, pas la météo) : c'est elle qui compare les lieux.
+    """
     out = []
     for r in rows:
         n = r["n_annees"] or 1
+        coverage = _ratio(r["noires_ciel_connu"], r["heures_noires"])
+        estimated = (r["heures_favorables"] / n / coverage) if coverage and coverage >= MIN_COVERAGE else None
         out.append({
             "lieu": r["location"], "mois": int(r["mois"]), "n_annees": int(r["n_annees"]),
             "heures_noires_an": r["heures_noires"] / n,
             "part_kp4": _ratio(r["noires_kp4"], r["noires_kp_connu"]),
             "part_degage": _ratio(r["noires_degagees"], r["noires_ciel_connu"]),
-            "couverture_ciel": _ratio(r["noires_ciel_connu"], r["heures_noires"]),
+            "couverture_ciel": coverage,
             "heures_favorables_an": r["heures_favorables"] / n,
+            "heures_favorables_an_estimees": estimated if r["heures_noires"] else 0.0,
             "nuits_favorables_an": r["nuits_favorables"] / n,
             "part_sans_lune": _ratio(r["favorables_sans_lune"], r["heures_favorables"]),
         })
@@ -156,32 +170,42 @@ def test_clear_sky(rows: list[dict]) -> dict:
 
 
 # ------------------------------------------------------------------------- recommandations
-def recommendations(ml: list[dict], kp_annee: list[dict]) -> list[str]:
-    ranked = sorted(ml, key=lambda r: -r["nuits_favorables_an"])
-    top = ranked[:3]
-    out = ["Meilleures périodes (nuits favorables par an, moyenne) : "
-           + " ; ".join(f"{NAMES.get(r['lieu'], r['lieu'])} en {MONTHS[r['mois'] - 1]} "
-                        f"({r['nuits_favorables_an']:.1f})" for r in top) + "."]
-    per_place = {}
+def season_hours(ml: list[dict]) -> dict[str, float]:
+    """Heures favorables estimées par an, de septembre à mars, par lieu."""
+    out: dict[str, float] = {}
     for r in ml:
-        if r["mois"] in (9, 10, 11, 12, 1, 2, 3):
-            per_place[r["lieu"]] = per_place.get(r["lieu"], 0) + r["nuits_favorables_an"]
+        if r["mois"] in (9, 10, 11, 12, 1, 2, 3) and r["heures_favorables_an_estimees"] is not None:
+            out[r["lieu"]] = out.get(r["lieu"], 0.0) + r["heures_favorables_an_estimees"]
+    return out
+
+
+def recommendations(ml: list[dict], kp_annee: list[dict]) -> list[str]:
+    usable = [r for r in ml if r["heures_favorables_an_estimees"]]
+    top = sorted(usable, key=lambda r: -r["heures_favorables_an_estimees"])[:3]
+    out = ["Meilleures périodes (heures favorables par an, estimées) : "
+           + " ; ".join(f"{NAMES.get(r['lieu'], r['lieu'])} en {MONTHS[r['mois'] - 1]} "
+                        f"({r['heures_favorables_an_estimees']:.1f} h)" for r in top) + "."]
+    per_place = season_hours(ml)
     if per_place:
-        best = max(per_place, key=per_place.get)
-        out.append(f"Sur une saison (septembre à mars), {NAMES.get(best, best)} offre le plus de nuits favorables : "
-                   f"{per_place[best]:.0f} par an en moyenne"
-                   + "".join(f", contre {per_place[p]:.0f} à {NAMES.get(p, p)}" for p in per_place if p != best) + ".")
+        ranked = sorted(per_place, key=per_place.get, reverse=True)
+        others = [f"{per_place[p]:.0f} h à {NAMES.get(p, p)}" for p in ranked[1:]]
+        out.append(f"Sur une saison (septembre à mars), {NAMES.get(ranked[0], ranked[0])} offre le plus d'heures "
+                   f"favorables : {per_place[ranked[0]]:.0f} h par an en moyenne"
+                   + (f", contre {' et '.join(others)}" if others else "") + ". L'écart entre lieux vient surtout du ciel.")
     dead = sorted({r["mois"] for r in ml if r["heures_noires_an"] < 1})
     if dead:
         out.append("À ne pas programmer : " + ", ".join(MONTHS[m - 1] for m in dead)
                    + " (pas de nuit noire : soleil de minuit ou crépuscule permanent).")
-    if kp_annee:
-        last = [r for r in kp_annee if r["tranches"] > 2000][-3:]
-        mean = np.mean([r["frequence_kp4"] for r in kp_annee if r["tranches"] > 2000])
-        if last and all(r["frequence_kp4"] > mean for r in last):
-            out.append(f"{last[0]['annee']}-{last[-1]['annee']} : années de forte activité (maximum du cycle solaire), "
-                       "au-dessus de la moyenne depuis 1932 : bonne période pour vendre des séjours, "
-                       "mais l'activité va décroître dans les années qui suivent.")
+    full = [r for r in kp_annee if r["tranches"] > 2000]
+    if full:
+        mean = float(np.mean([r["frequence_kp4"] for r in full]))
+        last = full[-1]
+        level = "au-dessus" if last["frequence_kp4"] > mean else "en dessous"
+        out.append(f"Cycle solaire : en {last['annee']}, {last['frequence_kp4']:.1%} des tranches de 3 h ont eu une "
+                   f"belle aurore, {level} de la moyenne depuis 1932 ({mean:.1%}). "
+                   + ("Profiter des prochaines saisons : l'activité redescend en général dans les années qui suivent "
+                      "un maximum." if level == "au-dessus" else
+                      "Ne pas promettre plus que la moyenne : l'activité varie d'un facteur 3 au cours d'un cycle."))
     out.append("Le ciel décide plus que le Soleil : à activité égale, une nuit couverte annule tout. "
                "Prévoir au moins 3 à 4 nuits sur place et des déplacements vers les zones dégagées.")
     return out

@@ -57,7 +57,9 @@ def test_build_indicators_tests_and_recommendations(agg):
     h2 = data["tests"]["ciel_degage"]
     assert h2["p_valeur"] < 0.05 and "Kiruna" in h2["conclusion"]
     recs = " ".join(data["recommandations"])
-    assert "Kiruna" in data["recommandations"][0] and "mai, juin, juillet" in recs and "cycle solaire" in recs
+    assert "Kiruna" in data["recommandations"][0] and "mai, juin, juillet" in recs and "Cycle solaire" in recs
+    assert kiruna_jan["heures_favorables_an_estimees"] == pytest.approx(80 / 16 / 0.9)    # corrigé de la couverture
+    assert june["heures_favorables_an_estimees"] == 0.0
     assert data["kp_mois"][2]["ic95"][0] < data["kp_mois"][2]["frequence_kp4"] < data["kp_mois"][2]["ic95"][1]
 
 
@@ -80,3 +82,12 @@ def test_sql_queries_run_on_the_warehouse(clean_dir):  # noqa: F811
     assert may["heures_noires"] == 0 and may["n_annees"] == 1                # soleil à -0,6 / -2,3° : pas noir
     assert agg["kp_mois"] == [{"mois": 5, "tranches": 1, "tranches_kp4": 1}]
     assert agg["kp_annee"][0]["annee"] == 2024 and agg["kp_jour"][0]["kp_max"] == pytest.approx(8.667)
+
+
+def test_estimate_corrects_low_coverage_and_drops_tiny_coverage():
+    rows = an.month_location([_row("tromso", 1, noires=1000, ciel=320, fav=32),
+                              _row("kiruna", 1, noires=1000, ciel=900, fav=90),
+                              _row("rovaniemi", 1, noires=1000, ciel=100, fav=10)])
+    est = {r["lieu"]: r["heures_favorables_an_estimees"] for r in rows}
+    assert est["tromso"] == pytest.approx(est["kiruna"])           # même ciel réel, station moins assidue
+    assert est["rovaniemi"] is None                                  # 10 % d'heures observées : trop fragile

@@ -112,10 +112,10 @@ footer { color: var(--muted); font-size: .82rem; display: grid; gap: 4px; }
 
   <section class="card" aria-labelledby="t1">
     <div class="label">1 · Meilleurs mois et meilleurs lieux</div>
-    <h2 id="t1">Nuits favorables par an : nuit noire, ciel dégagé et belle aurore (Kp ≥ 4) en même temps</h2>
-    <p>Moyenne sur les années complètes observées. Une case grise : pas de nuit noire ce mois-là (soleil de minuit ou crépuscule permanent). Survolez une case pour le détail.</p>
-    <div class="legend"><span>Moins</span><span class="ramp" id="ramp"></span><span>Plus de nuits favorables</span></div>
-    <div class="chart scroll"><div class="heat" id="heat" role="table" aria-label="Nuits favorables par an, par lieu et par mois"></div></div>
+    <h2 id="t1">Heures favorables par an : nuit noire, ciel dégagé et belle aurore (Kp ≥ 4) en même temps</h2>
+    <p>Moyenne sur les années complètes observées, corrigée des heures où la station météo n'a pas relevé les nuages (à Tromsø, environ deux heures sur trois). Case grise : pas de nuit noire ce mois-là. Survolez une case pour le détail.</p>
+    <div class="legend"><span>Moins</span><span class="ramp" id="ramp"></span><span>Plus d'heures favorables</span></div>
+    <div class="chart scroll"><div class="heat" id="heat" role="table" aria-label="Heures favorables par an, par lieu et par mois"></div></div>
     <details><summary>Voir le tableau détaillé (12 mois × 3 lieux)</summary><div class="tablewrap" id="table1"></div></details>
   </section>
 
@@ -183,7 +183,8 @@ function renderHeat(D) {
   const ramp = document.getElementById("ramp");
   ramp.innerHTML = [0, 1, 2, 3, 4, 5, 6].map(i => `<b style="background:var(--q${i})"></b>`).join("");
   const heat = document.getElementById("heat");
-  const vals = D.mois_lieu.filter(r => r.heures_noires_an >= 1).map(r => r.nuits_favorables_an);
+  const est = r => r.heures_favorables_an_estimees;
+  const vals = D.mois_lieu.filter(r => r.heures_noires_an >= 1 && est(r) != null).map(est);
   const max = Math.max(...vals, 0.1);
   const step = v => Math.min(6, Math.floor((v / max) * 7));
   let html = `<div></div>` + MOIS.map(m => `<div class="h" role="columnheader">${m}</div>`).join("");
@@ -191,9 +192,9 @@ function renderHeat(D) {
     html += `<div class="rowname" role="rowheader"><i style="background:${COL[L.code]}"></i>${L.nom}</div>`;
     for (let m = 1; m <= 12; m++) {
       const r = D.mois_lieu.find(x => x.lieu === L.code && x.mois === m);
-      if (!r || r.heures_noires_an < 1) { html += `<div class="cell none" role="cell" tabindex="0" data-l="${L.code}" data-m="${m}">–</div>`; continue; }
-      const s = step(r.nuits_favorables_an);
-      html += `<div class="cell" role="cell" tabindex="0" data-l="${L.code}" data-m="${m}" style="background:var(--q${s});color:var(${s >= 3 ? "--q-ink-light" : "--q-ink-dark"})">${fr(r.nuits_favorables_an)}</div>`;
+      if (!r || r.heures_noires_an < 1 || est(r) == null) { html += `<div class="cell none" role="cell" tabindex="0" data-l="${L.code}" data-m="${m}">–</div>`; continue; }
+      const s = step(est(r));
+      html += `<div class="cell" role="cell" tabindex="0" data-l="${L.code}" data-m="${m}" style="background:var(--q${s});color:var(${s >= 3 ? "--q-ink-light" : "--q-ink-dark"})">${fr(est(r))}</div>`;
     }
   }
   heat.innerHTML = html;
@@ -204,8 +205,9 @@ function renderHeat(D) {
     const nom = D.lieux.find(l => l.code === c.dataset.l).nom;
     const box = heat.parentElement.getBoundingClientRect(), cb = c.getBoundingClientRect();
     tip.show(`<b>${nom}, ${MOIS_L[+c.dataset.m - 1]}</b>` + (r && r.heures_noires_an >= 1 ?
-      `<div><span>Nuits favorables / an</span><span class="num">${fr(r.nuits_favorables_an)}</span></div>
-       <div><span>Heures favorables / an</span><span class="num">${fr(r.heures_favorables_an)}</span></div>
+      `<div><span>Heures favorables / an (estimées)</span><span class="num">${fr(est(r))}</span></div>
+       <div><span>Heures favorables observées</span><span class="num">${fr(r.heures_favorables_an)}</span></div>
+       <div><span>Nuits favorables observées</span><span class="num">${fr(r.nuits_favorables_an)}</span></div>
        <div><span>Heures noires / an</span><span class="num">${fr(r.heures_noires_an, 0)}</span></div>
        <div><span>Belle aurore (Kp ≥ 4)</span><span class="num">${pct(r.part_kp4)}</span></div>
        <div><span>Ciel dégagé</span><span class="num">${pct(r.part_degage)}</span></div>
@@ -216,8 +218,8 @@ function renderHeat(D) {
   heat.addEventListener("mouseleave", () => tip.hide()); heat.addEventListener("focusout", () => tip.hide());
 
   const rows = D.lieux.flatMap(L => D.mois_lieu.filter(r => r.lieu === L.code).map(r => ({ ...r, nom: L.nom })));
-  document.getElementById("table1").innerHTML = `<table><thead><tr><th>Lieu</th><th>Mois</th><th>Nuits fav. / an</th><th>Heures fav. / an</th><th>Heures noires / an</th><th>Kp ≥ 4</th><th>Ciel dégagé</th><th>Ciel observé</th><th>Sans Lune gênante</th></tr></thead><tbody>${
-    rows.map(r => `<tr><td>${r.nom}</td><td>${MOIS_L[r.mois - 1]}</td><td class="num">${fr(r.nuits_favorables_an)}</td><td class="num">${fr(r.heures_favorables_an)}</td><td class="num">${fr(r.heures_noires_an, 0)}</td><td class="num">${pct(r.part_kp4)}</td><td class="num">${pct(r.part_degage)}</td><td class="num">${pct(r.couverture_ciel)}</td><td class="num">${pct(r.part_sans_lune)}</td></tr>`).join("")
+  document.getElementById("table1").innerHTML = `<table><thead><tr><th>Lieu</th><th>Mois</th><th>Heures fav. / an (estimées)</th><th>Heures fav. observées</th><th>Nuits fav. observées</th><th>Heures noires / an</th><th>Kp ≥ 4</th><th>Ciel dégagé</th><th>Ciel observé</th><th>Sans Lune gênante</th></tr></thead><tbody>${
+    rows.map(r => `<tr><td>${r.nom}</td><td>${MOIS_L[r.mois - 1]}</td><td class="num">${fr(r.heures_favorables_an_estimees)}</td><td class="num">${fr(r.heures_favorables_an)}</td><td class="num">${fr(r.nuits_favorables_an)}</td><td class="num">${fr(r.heures_noires_an, 0)}</td><td class="num">${pct(r.part_kp4)}</td><td class="num">${pct(r.part_degage)}</td><td class="num">${pct(r.couverture_ciel)}</td><td class="num">${pct(r.part_sans_lune)}</td></tr>`).join("")
   }</tbody></table>`;
 }
 
@@ -332,13 +334,14 @@ function renderTests(D) {
 
 function renderTiles(D) {
   const season = [9, 10, 11, 12, 1, 2, 3];
-  const per = D.lieux.map(L => ({ L, n: D.mois_lieu.filter(r => r.lieu === L.code && season.includes(r.mois)).reduce((a, r) => a + r.nuits_favorables_an, 0) }))
+  const est = r => r.heures_favorables_an_estimees || 0;
+  const per = D.lieux.map(L => ({ L, n: D.mois_lieu.filter(r => r.lieu === L.code && season.includes(r.mois)).reduce((a, r) => a + est(r), 0) }))
     .sort((a, b) => b.n - a.n);
-  const best = [...D.mois_lieu].sort((a, b) => b.nuits_favorables_an - a.nuits_favorables_an)[0];
+  const best = [...D.mois_lieu].sort((a, b) => est(b) - est(a))[0];
   const e = D.tests.equinoxes.khi2;
   document.getElementById("tiles").innerHTML = `
-    <div class="tile"><span class="label">Meilleur lieu (saison)</span><span class="v">${per[0].L.nom}</span><span class="s"><span class="num">${fr(per[0].n, 0)}</span> nuits favorables par an, de septembre à mars</span></div>
-    <div class="tile"><span class="label">Meilleure période</span><span class="v">${MOIS_L[best.mois - 1]}</span><span class="s">à ${D.lieux.find(l => l.code === best.lieu).nom} : <span class="num">${fr(best.nuits_favorables_an)}</span> nuits favorables par an</span></div>
+    <div class="tile"><span class="label">Meilleur lieu (saison)</span><span class="v">${per[0].L.nom}</span><span class="s"><span class="num">${fr(per[0].n, 0)}</span> heures favorables par an, de septembre à mars</span></div>
+    <div class="tile"><span class="label">Meilleure période</span><span class="v">${MOIS_L[best.mois - 1]}</span><span class="s">à ${D.lieux.find(l => l.code === best.lieu).nom} : <span class="num">${fr(est(best))}</span> heures favorables par an</span></div>
     <div class="tile"><span class="label">Équinoxes</span><span class="v">× ${fr(e.rapport, 1)}</span><span class="s">belles aurores qu'aux solstices (depuis 1932)</span></div>`;
 }
 
