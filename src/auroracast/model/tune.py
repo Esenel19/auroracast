@@ -10,8 +10,12 @@ validation ; le test n'est lu qu'une fois, à la fin, pour mesurer le gain.
    puis élimination descendante : on retire une à une les variables dont l'absence dégrade le
    moins la validation, et on garde le plus petit jeu à moins de TOLERANCE du meilleur PR AUC.
 3. Hyperparamètres (C5.2.4) : recherche sur grille de la régression logistique (force C,
-   pénalité L1 ou L2, pondération des classes), sur les variables retenues.
-4. Avant / après : réglage actuel (config.json) contre réglage proposé, notes sur le test.
+   pénalité L1 ou L2, pondération des classes), sur les variables retenues ; puis grille de la
+   forêt aléatoire (taille minimale des feuilles, part des variables par nœud) choisie sur une
+   validation GLISSANTE : 3 années (2021, 2022, 2023), chacune prédite par un modèle appris sur
+   tout ce qui précède. Un choix qui tient sur 3 années résiste mieux au cycle solaire.
+4. Choix et avant / après : réglage actuel, logistique optimisée et forêt optimisée sont notés sur
+   la même validation glissante ; le meilleur est proposé, puis tous sont mesurés sur le test.
 
 Critère : PR AUC de la validation (les belles aurores sont rares ; le ROC AUC flatte les classes
 déséquilibrées), à égalité le score de Brier (probabilités bien calibrées pour le directeur).
@@ -30,6 +34,7 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pandas as pd
 from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.inspection import permutation_importance
@@ -39,8 +44,10 @@ from auroracast.model.train import (
     DEFAULT_CONFIG,
     FEATURES,
     HORIZONS,
+    RF_DEFAULTS,
     best_threshold,
     build_model,
+    known,
     metrics,
     model_config,
     read_training,
@@ -53,15 +60,17 @@ CS = (0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0)
 PENALTIES = ("l2", "l1")
 CLASS_WEIGHTS = (None, "balanced")
 CORRELATION_ALERT = 0.85
+ROLLING_YEARS = (2021, 2022, 2023)      # validation glissante (le test 2024+ reste intact)
+RF_GRID = [{"min_samples_leaf": leaf, "max_features": mf} for leaf in (25, 100) for mf in ("sqrt", 0.5)]
 
 
-def algorithms(n_trees: int = 200) -> dict:
+def algorithms(n_trees: int = 100) -> dict:
     return {
         "regression_logistique": lambda: build_model(config=DEFAULT_CONFIG),
         "foret_aleatoire": lambda: Pipeline([
             ("imputer", SimpleImputer(strategy="median")),
             ("rf", RandomForestClassifier(n_estimators=n_trees, min_samples_leaf=20, max_features="sqrt",
-                                          n_jobs=-1, random_state=0)),
+                                          max_samples=0.5, n_jobs=-1, random_state=0)),
         ]),
         "gradient_boosting": lambda: HistGradientBoostingClassifier(
             learning_rate=0.05, max_iter=300, max_leaf_nodes=15, l2_regularization=1.0, random_state=0),
@@ -89,7 +98,7 @@ def _rank(row: dict) -> tuple:
 
 
 # ------------------------------------------------------------------------- 1. algorithmes
-def compare_algorithms(tr, va, tgt: str, n_trees: int = 200) -> list[dict]:
+def compare_algorithms(tr, va, tgt: str, n_trees: int = 100) -> list[dict]:
     rows = [{"algorithme": name, **score(make(), tr, va, tgt)} for name, make in algorithms(n_trees).items()]
     return sorted(rows, key=_rank)
 
@@ -148,6 +157,39 @@ def grid_search(tr, va, tgt: str, features: list[str]) -> list[dict]:
     return sorted(rows, key=_rank)
 
 
+def rolling_folds(df, horizon: int) -> list[tuple[int, pd.DataFrame, pd.DataFrame]]:
+    """(année, apprentissage, validation). L'apprentissage s'arrête h heures avant l'année validée :
+    au-delà, la cible déborderait sur elle."""
+    tgt = target(horizon)
+    data = known(df, tgt)
+    folds = []
+    for y in ROLLING_YEARS:
+        start, end = pd.Timestamp(f"{y}-01-01", tz="UTC"), pd.Timestamp(f"{y + 1}-01-01", tz="UTC")
+        tr = data[data.index < start - pd.Timedelta(hours=horizon)]
+        va = data[(data.index >= start) & (data.index < end)]
+        if len(va) and tr[tgt].nunique() == 2 and va[tgt].nunique() == 2:
+            folds.append((y, tr, va))
+    return folds
+
+
+def cv_score(cfg: dict, folds, tgt: str) -> dict:
+    """Moyenne des notes sur les années de validation glissante, avec le détail par année."""
+    per_year = {y: score(build_model(config=cfg), tr, va, tgt) for y, tr, va in folds}
+    mean = {k: sum(s[k] for s in per_year.values()) / len(per_year) for k in ("pr_auc", "roc_auc", "brier")}
+    return {**{k: round(float(v), 4) for k, v in mean.items()},
+            "duree_apprentissage_s": round(sum(s["duree_apprentissage_s"] for s in per_year.values()), 2),
+            "par_annee": {str(y): {k: s[k] for k in ("pr_auc", "brier")} for y, s in per_year.items()}}
+
+
+def forest_search(folds, tgt: str) -> list[dict]:
+    rows = []
+    for params in RF_GRID:
+        cfg = {**DEFAULT_CONFIG, "algorithme": "foret_aleatoire", **RF_DEFAULTS, **params,
+               "features": list(FEATURES)}
+        rows.append({**params, "config": cfg, **cv_score(cfg, folds, tgt)})
+    return sorted(rows, key=_rank)
+
+
 # ------------------------------------------------------------------------- 4. avant / après
 def evaluate(cfg: dict, parts: dict, tgt: str) -> dict:
     """Apprend sur 2010-2021, seuil choisi sur la validation, notes sur le test."""
@@ -158,7 +200,7 @@ def evaluate(cfg: dict, parts: dict, tgt: str) -> dict:
     return {k: m[k] for k in ("roc_auc", "pr_auc", "brier", "seuil", "precision", "rappel", "f1")}
 
 
-def tune_horizon(df, horizon: int, n_trees: int = 200) -> dict:
+def tune_horizon(df, horizon: int, n_trees: int = 100) -> dict:
     tgt = target(horizon)
     parts = split(df, tgt)
     tr, va = parts["train"], parts["validation"]
@@ -167,9 +209,17 @@ def tune_horizon(df, horizon: int, n_trees: int = 200) -> dict:
     path, selected = backward_selection(tr, va, tgt)
     grid = grid_search(tr, va, tgt, selected)
     best = grid[0]
-    proposed = _cfg(selected, C=best["C"], penalty=best["penalty"], class_weight=best["class_weight"])
+    logit_cfg = _cfg(selected, C=best["C"], penalty=best["penalty"], class_weight=best["class_weight"])
+
+    folds = rolling_folds(df, horizon)
+    forest = forest_search(folds, tgt)
     current = model_config(horizon)
-    before, after = evaluate(current, parts, tgt), evaluate(proposed, parts, tgt)
+    candidates = {"reglage_actuel": current, "logistique_optimisee": logit_cfg,
+                  "foret_optimisee": forest[0]["config"]}
+    cv = {name: cv_score(cfg, folds, tgt) for name, cfg in candidates.items()}
+    chosen = min(cv, key=lambda name: _rank(cv[name]))
+    test = {name: evaluate(cfg, parts, tgt) for name, cfg in candidates.items()}
+    before, after = test["reglage_actuel"], test[chosen]
     gain = {k: (None if before[k] is None or after[k] is None else round(after[k] - before[k], 4))
             for k in ("roc_auc", "pr_auc", "brier", "f1")}
     return {
@@ -182,8 +232,12 @@ def tune_horizon(df, horizon: int, n_trees: int = 200) -> dict:
         "selection": {"chemin": path, "retenues": selected,
                       "ecartees": [f for f in FEATURES if f not in selected], "tolerance_pr_auc": TOLERANCE},
         "grille": grid,
+        "grille_foret": [{k: v for k, v in r.items() if k != "config"} for r in forest],
+        "validation_glissante": {"annees": [y for y, _, _ in folds], "candidats": cv},
+        "choix": chosen,
         "reglage_actuel": current,
-        "reglage_propose": proposed,
+        "reglage_propose": candidates[chosen],
+        "test_candidats": test,
         "test_avant": before,
         "test_apres": after,
         "gain_test": gain,
@@ -217,16 +271,30 @@ def to_markdown(res: dict) -> str:
     lines += [f"| {p['n_variables']} | {p['retiree'] or '—'} | {_f(p['pr_auc'])} | {_f(p['brier'], 4)} |" for p in sel["chemin"]]
     lines += ["", (f"Retenues ({len(sel['retenues'])}) : {', '.join(sel['retenues'])}. "
               f"Écartées : {', '.join(sel['ecartees']) or 'aucune'}."), "",
-              "### 3. Hyperparamètres (5 meilleurs réglages sur 28)", "",
+              "### 3. Hyperparamètres", "",
+              "Régression logistique (5 meilleurs réglages sur 28, validation 2022-2023) :", "",
               "| C | Pénalité | Pondération | PR AUC | Brier |", "| --- | --- | --- | --- | --- |"]
     lines += [f"| {r['C']} | {r['penalty']} | {r['class_weight'] or 'aucune'} | {_f(r['pr_auc'])} | {_f(r['brier'], 4)} |"
               for r in res["grille"][:5]]
-    b, a, g = res["test_avant"], res["test_apres"], res["gain_test"]
-    lines += ["", "### 4. Avant / après, sur le test (jamais vu pendant les choix)", "",
-              "| | ROC AUC | PR AUC | Brier | F1 |", "| --- | --- | --- | --- | --- |",
-              f"| Réglage actuel | {_f(b['roc_auc'])} | {_f(b['pr_auc'])} | {_f(b['brier'], 4)} | {_f(b['f1'])} |",
-              f"| Réglage proposé | {_f(a['roc_auc'])} | {_f(a['pr_auc'])} | {_f(a['brier'], 4)} | {_f(a['f1'])} |",
-              f"| Gain | {_f(g['roc_auc'], 4)} | {_f(g['pr_auc'], 4)} | {_f(g['brier'], 4)} | {_f(g['f1'], 4)} |", ""]
+    vg = res["validation_glissante"]
+    years = ", ".join(str(y) for y in vg["annees"])
+    lines += ["", f"Forêt aléatoire (100 arbres, validation glissante {years}) :", "",
+              "| Feuille min. | Variables par nœud | PR AUC moyen | Brier moyen |", "| --- | --- | --- | --- |"]
+    lines += [f"| {r['min_samples_leaf']} | {r['max_features']} | {_f(r['pr_auc'])} | {_f(r['brier'], 4)} |"
+              for r in res["grille_foret"]]
+    names = {"reglage_actuel": "Réglage actuel", "logistique_optimisee": "Logistique optimisée",
+             "foret_optimisee": "Forêt optimisée"}
+    lines += ["", f"### 4. Choix sur la validation glissante ({years}), puis mesure sur le test", "",
+              "| Candidat | PR AUC glissant | Brier glissant | ROC AUC test | PR AUC test | Brier test | F1 test |",
+              "| --- | --- | --- | --- | --- | --- | --- |"]
+    for name, label in names.items():
+        c, t = vg["candidats"][name], res["test_candidats"][name]
+        mark = " **(retenu)**" if name == res["choix"] else ""
+        lines.append(f"| {label}{mark} | {_f(c['pr_auc'])} | {_f(c['brier'], 4)} | {_f(t['roc_auc'])} | "
+                     f"{_f(t['pr_auc'])} | {_f(t['brier'], 4)} | {_f(t['f1'])} |")
+    g = res["gain_test"]
+    lines += ["", (f"Gain du réglage retenu sur le test, par rapport au réglage actuel : ROC AUC {_f(g['roc_auc'], 4)}, "
+                   f"PR AUC {_f(g['pr_auc'], 4)}, Brier {_f(g['brier'], 4)} (négatif = mieux), F1 {_f(g['f1'], 4)}."), ""]
     return "\n".join(lines)
 
 
@@ -235,7 +303,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", default="optimisation")
     parser.add_argument("--horizons", type=int, nargs="+", default=list(HORIZONS), choices=HORIZONS)
     parser.add_argument("--database-url", default=None)
-    parser.add_argument("--n-trees", type=int, default=200, help="arbres de la forêt aléatoire")
+    parser.add_argument("--n-trees", type=int, default=100, help="arbres de la forêt aléatoire")
     args = parser.parse_args(argv)
 
     import os
@@ -253,10 +321,8 @@ def main(argv: list[str] | None = None) -> int:
     for h in args.horizons:
         res = tune_horizon(df, h, args.n_trees)
         results.append(res)
-        print(f"Horizon {h} h : {len(res['selection']['retenues'])} variables, "
-              f"C={res['reglage_propose']['C']} {res['reglage_propose']['penalty']} "
-              f"{res['reglage_propose']['class_weight'] or ''} ; gain PR AUC test {res['gain_test']['pr_auc']:+.4f} "
-              f"({res['duree_s']} s)", flush=True)
+        print(f"Horizon {h} h : retenu {res['choix']} ; gain test PR AUC {res['gain_test']['pr_auc']:+.4f}, "
+              f"ROC AUC {res['gain_test']['roc_auc']:+.4f} ({res['duree_s']} s)", flush=True)
     made = datetime.now(UTC).isoformat(timespec="minutes")
     (out / "optimisation.json").write_text(json.dumps({"genere_le": made, "horizons": results},
                                                       indent=2, ensure_ascii=False), encoding="utf-8")
@@ -264,7 +330,8 @@ def main(argv: list[str] | None = None) -> int:
                 "horizons": {str(r["horizon_h"]): r["reglage_propose"] for r in results}}
     (out / "config_proposee.json").write_text(json.dumps(proposed, indent=2, ensure_ascii=False), encoding="utf-8")
     report = [f"# Optimisation des modèles AuroraCast ({made[:16].replace('T', ' ')} UTC)", "",
-              "Choix faits sur la validation (2022-2023) ; le test (2024 → aujourd'hui) ne sert qu'à mesurer le gain.", ""]
+              ("Choix faits sur la validation (2022-2023, et années glissantes 2021 à 2023 pour le choix final) ; "
+               "le test (2024 → aujourd'hui) ne sert qu'à mesurer le gain."), ""]
     report += [to_markdown(r) for r in results]
     (out / "rapport_optimisation.md").write_text("\n".join(report), encoding="utf-8")
     print("\n".join(report))

@@ -30,12 +30,43 @@ def test_tune_horizon_report(training_df):
     res = tune.tune_horizon(training_df, 24, n_trees=20)
     assert {r["algorithme"] for r in res["algorithmes"]} == {"regression_logistique", "foret_aleatoire",
                                                             "gradient_boosting"}
-    assert set(res["reglage_propose"]["features"]) == set(res["selection"]["retenues"])
+    assert res["choix"] in {"reglage_actuel", "logistique_optimisee", "foret_optimisee"}
+    assert res["validation_glissante"]["annees"] == list(tune.ROLLING_YEARS)
+    assert len(res["grille_foret"]) == len(tune.RF_GRID)
+    assert res["test_apres"] == res["test_candidats"][res["choix"]]
     assert res["test_avant"]["roc_auc"] and res["test_apres"]["roc_auc"]
     assert res["gain_test"]["pr_auc"] == pytest.approx(res["test_apres"]["pr_auc"] - res["test_avant"]["pr_auc"],
                                                        abs=1e-4)
     md = tune.to_markdown(res)
-    assert "Avant / après" in md and "Élimination descendante" in md
+    assert "Choix sur la validation glissante" in md and "Élimination descendante" in md
+
+
+@pytest.mark.parametrize("horizon", [6, 48])
+def test_rolling_folds_have_no_target_overlap(training_df, horizon):
+    import pandas as pd
+
+    folds = tune.rolling_folds(training_df, horizon)
+    assert [y for y, _, _ in folds] == list(tune.ROLLING_YEARS)
+    for y, tr, va in folds:
+        start = pd.Timestamp(f"{y}-01-01", tz="UTC")
+        assert tr.index.max() < start - pd.Timedelta(hours=horizon)       # cible jamais dans l'année validée
+        assert va.index.min() >= start and va.index.max() < pd.Timestamp(f"{y + 1}-01-01", tz="UTC")
+
+
+def test_forest_config_trains_and_reports_importances(tmp_path, monkeypatch, training_df):
+    cfg = {"horizons": {"24": {"algorithme": "foret_aleatoire", "n_estimators": 20, "min_samples_leaf": 20}}}
+    f = tmp_path / "config.json"
+    f.write_text(json.dumps(cfg))
+    monkeypatch.setattr(tm, "CONFIG_FILE", f)
+    model, results = tm.train(training_df, 24)
+    assert "rf" in model.named_steps and "coefficients" not in results
+    top = max(results["importances"], key=results["importances"].get)
+    assert top in {"kp", "bz_mean_3h"}
+    assert results["reglage"]["algorithme"] == "foret_aleatoire"
+    assert "Importance des variables" in tm.to_markdown(results)
+    f.write_text(json.dumps({"horizons": {"24": {"algorithme": "xgboost"}}}))
+    with pytest.raises(ValueError):
+        tm.model_config(24)
 
 
 def test_config_drives_the_model(tmp_path, monkeypatch, training_df):

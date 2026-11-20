@@ -43,7 +43,10 @@ FEATURES = [
     "bz_mean_3h", "bz_min_6h", "bt_mean_3h", "speed_mean_6h", "density_mean_6h",
     "f107", "doy_sin", "doy_cos",
 ]
-DEFAULT_CONFIG = {"features": FEATURES, "C": 1.0, "penalty": "l2", "class_weight": None}
+DEFAULT_CONFIG = {"algorithme": "regression_logistique", "features": FEATURES,
+                  "C": 1.0, "penalty": "l2", "class_weight": None}
+ALGORITHMS = ("regression_logistique", "foret_aleatoire")
+RF_DEFAULTS = {"n_estimators": 100, "max_samples": 0.5, "min_samples_leaf": 50, "max_features": "sqrt"}
 CONFIG_FILE = Path(__file__).with_name("config.json")
 VALIDATION_START = pd.Timestamp("2022-01-01", tz="UTC")
 TEST_START = pd.Timestamp("2024-01-01", tz="UTC")
@@ -113,12 +116,24 @@ def model_config(horizon: int | None = None) -> dict:
     unknown = set(cfg["features"]) - set(FEATURES)
     if unknown:
         raise ValueError(f"variables inconnues dans config.json : {sorted(unknown)}")
+    if cfg["algorithme"] not in ALGORITHMS:
+        raise ValueError(f"algorithme inconnu dans config.json : {cfg['algorithme']}")
     return cfg
 
 
 def build_model(horizon: int | None = None, config: dict | None = None) -> Pipeline:
-    """Variables retenues → médiane pour les manquantes → mise à l'échelle → régression logistique."""
+    """Variables retenues → médiane pour les manquantes → mise à l'échelle → régression logistique,
+    ou forêt aléatoire si config.json le demande (algorithme = foret_aleatoire)."""
     cfg = {**DEFAULT_CONFIG, **(config or model_config(horizon))}
+    if cfg["algorithme"] == "foret_aleatoire":
+        from sklearn.ensemble import RandomForestClassifier
+
+        rf = {k: cfg.get(k, v) for k, v in RF_DEFAULTS.items()}
+        return Pipeline([
+            ("select", SelectColumns(list(cfg["features"]))),
+            ("imputer", SimpleImputer(strategy="median")),
+            ("rf", RandomForestClassifier(**rf, n_jobs=-1, random_state=0)),
+        ])
     return Pipeline([
         ("select", SelectColumns(list(cfg["features"]))),
         ("imputer", SimpleImputer(strategy="median")),
@@ -204,9 +219,13 @@ def train(df: pd.DataFrame, horizon: int = 24) -> tuple[Pipeline, dict]:
         results["persistance"][name] = metrics(y, persistence_proba(p), 0.5)
         results["climatologie"][name] = metrics(y, climatology_proba(p, clim), clim_threshold)
 
-    logit = model.named_steps["logit"]
-    results["coefficients"] = {"constante": float(logit.intercept_[0]),
-                               **{f: float(c) for f, c in zip(cfg["features"], logit.coef_[0])}}
+    if "logit" in model.named_steps:
+        logit = model.named_steps["logit"]
+        results["coefficients"] = {"constante": float(logit.intercept_[0]),
+                                   **{f: float(c) for f, c in zip(cfg["features"], logit.coef_[0])}}
+    else:
+        rf = model.named_steps["rf"]
+        results["importances"] = {f: float(v) for f, v in zip(cfg["features"], rf.feature_importances_)}
     results["periodes"] = {k: [p.index.min().isoformat(), p.index.max().isoformat()]
                            for k, p in parts.items()}
 
@@ -215,7 +234,7 @@ def train(df: pd.DataFrame, horizon: int = 24) -> tuple[Pipeline, dict]:
     production = build_model(config=cfg).fit(everything[FEATURES], everything[tgt])
     results["production"] = {"n": len(everything), "jusqu_au": everything.index.max().isoformat()}
     results["variables"] = list(cfg["features"])
-    results["reglage"] = {k: cfg[k] for k in ("C", "penalty", "class_weight")}
+    results["reglage"] = {k: v for k, v in cfg.items() if k != "features"}
     return production, results
 
 
@@ -246,14 +265,24 @@ def to_markdown(results: dict, latest: dict | None = None) -> str:
             m = results[name][part]
             lines.append(f"| {part} | {name} | {fmt(m['roc_auc'])} | {fmt(m['pr_auc'])} | {fmt(m['brier'])} "
                          f"| {m['precision']:.3f} | {m['rappel']:.3f} | {m['f1']:.3f} |")
-    lines += ["", "Coefficients du modèle évalué (variables centrées-réduites : comparables entre elles) :", "",
-              "| Variable | Coefficient |", "| --- | --- |"]
-    lines += [f"| {k} | {v:+.3f} |" for k, v in results["coefficients"].items()]
+    if "coefficients" in results:
+        lines += ["", "Coefficients du modèle évalué (variables centrées-réduites : comparables entre elles) :", "",
+                  "| Variable | Coefficient |", "| --- | --- |"]
+        lines += [f"| {k} | {v:+.3f} |" for k, v in results["coefficients"].items()]
+    else:
+        lines += ["", "Importance des variables dans la forêt aléatoire (somme = 1) :", "",
+                  "| Variable | Importance |", "| --- | --- |"]
+        lines += [f"| {k} | {v:.3f} |" for k, v in sorted(results["importances"].items(), key=lambda kv: -kv[1])]
     if latest:
         lines += ["", (f"Dernière tranche ({latest['tranche_utc'][:16].replace('T', ' ')} UTC) : "
                        f"probabilité **{latest['probabilite']:.0%}** → "
                        f"{'alerte' if latest['alerte'] else 'pas d’alerte'}.")]
     return "\n".join(lines) + "\n"
+
+
+def _model_type(results: dict) -> str:
+    algo = results.get("reglage", {}).get("algorithme", "regression_logistique")
+    return "RandomForestClassifier" if algo == "foret_aleatoire" else "LogisticRegression"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -279,7 +308,7 @@ def main(argv: list[str] | None = None) -> int:
         model, results = train(df, h)
         auc = results["modele"]["test"]["roc_auc"]
         if auc is None or auc < args.min_auc:
-            tracking.log_training(model, results, example, accepted=False)
+            tracking.log_training(model, results, example, accepted=False, model_type=_model_type(results))
             print(f"Horizon {h} h : ROC AUC du test {auc} < {args.min_auc}. Rien n'est enregistré, "
                   "l'ancien modèle reste en service.")
             return 1
@@ -296,7 +325,8 @@ def main(argv: list[str] | None = None) -> int:
         (out / f"metrics_{h}h.json").write_text(json.dumps(results, indent=2, ensure_ascii=False),
                                                 encoding="utf-8")
         reports.append(to_markdown(results, results["derniere_prevision"]))
-        version = tracking.log_training(model, results, example, accepted=True, report=reports[-1])
+        version = tracking.log_training(model, results, example, accepted=True, report=reports[-1],
+                                        model_type=_model_type(results))
         if version:
             print(f"MLflow : {tracking.registered_name(h)} version {version} (alias production)")
     report = "\n".join(reports)
