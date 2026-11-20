@@ -293,11 +293,16 @@ resource pgFirewall 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@202
 }
 
 // ------------------------------------------------------------------ Container Apps
-resource env 'Microsoft.App/managedEnvironments@2024-03-01' = {
+// Mode standard explicite : sans lui, Azure peut créer un environnement « Express », qui refuse
+// les Container Apps Jobs (erreur ExpressEnvironmentResourceNotSupported). Propriété en préversion.
+#disable-next-line BCP081
+resource env 'Microsoft.App/managedEnvironments@2025-10-02-preview' = {
   name: 'cae-auroracast'
   location: location
   tags: tags
   properties: {
+    #disable-next-line BCP037
+    environmentMode: 'WorkloadProfiles'
     appLogsConfiguration: {
       destination: 'log-analytics'
       logAnalyticsConfiguration: {

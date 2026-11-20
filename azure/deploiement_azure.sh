@@ -111,6 +111,14 @@ else
 fi
 
 # ----------------------------------------------------------------------------- 3. déploiement
+# Un environnement créé en mode « Express » refuse les tâches planifiées : on le recrée en standard.
+MODE=$(az resource show -g "$RG" -n cae-auroracast --resource-type Microsoft.App/managedEnvironments          --api-version 2025-10-02-preview --query properties.environmentMode -o tsv 2> /dev/null || true)
+if [ "$MODE" = "Express" ]; then
+  etape "3a. Environnement Container Apps en mode Express : suppression avant recréation en mode standard"
+  az containerapp delete -n ca-auroracast-api -g "$RG" --yes -o none 2> /dev/null || true
+  az containerapp env delete -n cae-auroracast -g "$RG" --yes -o none
+fi
+
 etape "3. Déploiement du modèle Bicep (quelques minutes)"
 deployer() { az deployment group create -g "$RG" -n auroracast -f "$TEMPLATE" -p "${PARAMS[@]}" -o none; }
 if ! deployer; then
