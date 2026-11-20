@@ -21,6 +21,37 @@ def test_backtest_has_no_leak_and_grows(training_df):
     assert all(0 <= r["roc_auc"] <= 1 for r in rows if r["roc_auc"] is not None)
 
 
+def test_backtest_forest_retrains_each_quarter(tmp_path, monkeypatch, training_df):
+    f = tmp_path / "config.json"
+    f.write_text(json.dumps({"horizons": {"24": {"algorithme": "foret_aleatoire", "n_estimators": 200}}}))
+    monkeypatch.setattr(tm, "CONFIG_FILE", f)
+    fitted = []
+    real = hi.build_model
+
+    def spy(*a, **k):
+        fitted.append(k["config"]["n_estimators"])
+        return real(*a, **k)
+
+    monkeypatch.setattr(hi, "build_model", spy)
+    rows = hi.backtest(training_df, horizons=(24,), start="2025-01-01", min_rows=20)
+    quarters = {(r["mois"][:4], (int(r["mois"][5:]) - 1) // 3) for r in rows}
+    assert len(rows) >= 6 and len(quarters) <= len(fitted) <= len(quarters) + 1   # + le trimestre en cours
+    assert set(fitted) == {hi.BACKTEST_TREES}                    # arbres limités pour tenir en 900 s
+    by_month = {r["mois"]: r["n_appris"] for r in rows}
+    assert by_month["2025-02"] == by_month["2025-01"]           # même modèle tout le trimestre
+    assert by_month["2025-04"] > by_month["2025-01"]            # réentraîné en avril
+
+
+def test_shipped_config_is_valid(monkeypatch):
+    from pathlib import Path
+
+    monkeypatch.setattr(tm, "CONFIG_FILE", Path(tm.__file__).with_name("config.json"))   # le vrai réglage
+    for h in tm.HORIZONS:
+        cfg = tm.model_config(h)
+        assert cfg["algorithme"] in tm.ALGORITHMS and set(cfg["features"]) <= set(tm.FEATURES)
+        tm.build_model(config=cfg)
+
+
 @pytest.fixture
 def models_repo(tmp_path, training_df):
     """Dépôt Git avec deux versions de modèles (deux commits), comme la branche models."""

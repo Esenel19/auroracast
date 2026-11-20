@@ -5,6 +5,13 @@ import pytest
 from auroracast.model import train as tm
 
 
+@pytest.fixture(autouse=True)
+def default_model_config(tmp_path_factory, monkeypatch):
+    """Les tests ne dépendent pas du réglage de production (config.json) : réglage d'origine,
+    sauf si un test pointe CONFIG_FILE vers son propre fichier."""
+    monkeypatch.setattr(tm, "CONFIG_FILE", tmp_path_factory.mktemp("cfg") / "absent.json")
+
+
 @pytest.fixture
 def training_df():
     """Série synthétique 2010-2026 : le Kp futur dépend du Kp et du Bz présents."""

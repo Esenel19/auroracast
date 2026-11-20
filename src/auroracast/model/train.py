@@ -321,7 +321,7 @@ def main(argv: list[str] | None = None) -> int:
     reports = []
     for h, (model, results) in trained.items():
         joblib.dump({"model": model, "features": FEATURES, "threshold": results["seuil_alerte"],
-                     "horizon_h": h}, out / model_file(h))
+                     "horizon_h": h}, out / model_file(h), compress=3)   # forêt : ~1-2 Mo au lieu de ~6
         (out / f"metrics_{h}h.json").write_text(json.dumps(results, indent=2, ensure_ascii=False),
                                                 encoding="utf-8")
         reports.append(to_markdown(results, results["derniere_prevision"]))

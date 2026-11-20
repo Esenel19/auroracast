@@ -34,12 +34,14 @@ from auroracast.model.train import (
     build_model,
     known,
     metrics,
+    model_config,
     model_file,
     read_training,
     target,
 )
 
 BACKTEST_START = "2016-01-01"
+BACKTEST_TREES = 40
 DEFAULT_THRESHOLDS = {6: 0.21, 24: 0.24, 48: 0.17}
 
 
@@ -49,7 +51,11 @@ def backtest(df: pd.DataFrame, horizons=HORIZONS, start: str = BACKTEST_START,
     """Réentraînement simulé au début de chaque mois, note sur le mois qui suit.
 
     Pas de fuite : une tranche n'entre dans l'apprentissage que si toute sa cible (les h heures
-    suivantes) est antérieure au début du mois évalué.
+    suivantes) est antérieure au début du mois du réentraînement.
+
+    Forêt aléatoire (réglage de config.json) : réentraînement simulé chaque trimestre seulement, avec
+    BACKTEST_TREES arbres, pour tenir dans la durée maximale de la tâche (900 s). Chaque mois reste
+    noté, par le dernier modèle réentraîné.
     """
     thresholds = thresholds or DEFAULT_THRESHOLDS
     last = df.index.max()
@@ -57,13 +63,21 @@ def backtest(df: pd.DataFrame, horizons=HORIZONS, start: str = BACKTEST_START,
     rows = []
     for h in horizons:
         data = known(df, target(h))
+        cfg = model_config(h)
+        forest = cfg["algorithme"] == "foret_aleatoire"
+        if forest:
+            cfg = {**cfg, "n_estimators": min(cfg.get("n_estimators", BACKTEST_TREES), BACKTEST_TREES)}
+        model = None
         for m in months:
             end = m + pd.offsets.MonthBegin(1)
-            tr = data[data.index < m - pd.Timedelta(hours=h)]
             te = data[(data.index >= m) & (data.index < end)]
-            if len(te) < min_rows or tr[target(h)].nunique() < 2:
+            if model is None or not forest or m.month in (1, 4, 7, 10):
+                tr = data[data.index < m - pd.Timedelta(hours=h)]
+                if tr[target(h)].nunique() < 2:
+                    continue
+                model = build_model(config=cfg).fit(tr[FEATURES], tr[target(h)])
+            if len(te) < min_rows:
                 continue
-            model = build_model(h).fit(tr[FEATURES], tr[target(h)])
             proba = model.predict_proba(te[FEATURES])[:, 1]
             met = metrics(te[target(h)].to_numpy(), proba, thresholds.get(h, 0.5))
             rows.append({"mois": m.strftime("%Y-%m"), "horizon_h": h, "n_appris": len(tr),
