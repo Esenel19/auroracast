@@ -49,3 +49,18 @@ def test_refused_model_is_traced_not_registered(local_mlflow, training_df, monke
     runs = mlflow.search_runs(experiment_names=[tracking.EXPERIMENT])
     assert list(runs["tags.statut"]) == ["refusé"]
     assert mlflow.MlflowClient().search_registered_models() == []
+
+
+def test_forest_model_is_registered(local_mlflow, training_df, tmp_path, monkeypatch):
+    """Une forêt aléatoire (avec l'étape SelectColumns) passe le format skops et entre au registre."""
+    import json
+
+    cfg = tmp_path / "config.json"
+    cfg.write_text(json.dumps({"horizons": {"24": {"algorithme": "foret_aleatoire", "n_estimators": 10}}}))
+    monkeypatch.setattr(tm, "CONFIG_FILE", cfg)
+    model, results = tm.train(training_df, 24)
+    example = training_df[tm.FEATURES].dropna().tail(3)
+    version = tracking.log_training(model, results, example, accepted=True, model_type="RandomForestClassifier")
+    assert version == "1"
+    loaded = mlflow.sklearn.load_model(f"models:/{tracking.registered_name(24)}@production")
+    assert loaded.predict_proba(example).shape == (3, 2)

@@ -84,7 +84,12 @@ def log_training(model, results: dict, x_example, accepted: bool, model_type: st
         signature = infer_signature(x_example, model.predict_proba(x_example)[:, 1])
         extra = {}
         if "skops_trusted_types" in inspect.signature(mlflow.sklearn.log_model).parameters:
-            extra["skops_trusted_types"] = ["numpy.dtype"]          # format skops (sans pickle arbitraire)
+            # Format skops (sans pickle arbitraire). Types autorisés : notre étape de sélection des
+            # variables et les arbres de la forêt aléatoire. skops se méfie des arbres car un fichier
+            # trafiqué pourrait faire planter la prédiction ; ici les modèles sont produits par
+            # notre propre entraînement, jamais reçus de l'extérieur.
+            extra["skops_trusted_types"] = ["numpy.dtype", "auroracast.model.train.SelectColumns",
+                                            "sklearn.tree._tree.Tree"]
         info = mlflow.sklearn.log_model(model, name=f"kp4_{h}h", signature=signature,
                                         registered_model_name=registered_name(h), **extra)
         version = str(info.registered_model_version)
